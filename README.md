@@ -17,7 +17,7 @@
 
 <br/>
 
-[**Live Demo**](https://your-app.vercel.app) · [**API Docs**](https://your-backend.onrender.com/docs) · [**Report Bug**](https://github.com/yourusername/ai-workspace/issues) · [**Request Feature**](https://github.com/yourusername/ai-workspace/issues)
+[**Live Demo**](https://your-app.vercel.app) 
 
 </div>
 
@@ -777,8 +777,8 @@ npm run build                 # Production build test
 
 **AI Engineer** building production-grade AI systems.
 
-[![LinkedIn](https://img.shields.io/badge/LinkedIn-Connect-0077b5?style=flat-square&logo=linkedin)](https://linkedin.com/in/your-profile)
-[![GitHub](https://img.shields.io/badge/GitHub-Follow-181717?style=flat-square&logo=github)](https://github.com/yourusername)
+[![LinkedIn](https://img.shields.io/badge/LinkedIn-Connect-0077b5?style=flat-square&logo=linkedin)](www.linkedin.com/in/rutuja-deshmukh29)
+[![GitHub](https://img.shields.io/badge/GitHub-Follow-181717?style=flat-square&logo=github)](https://github.com/RutujaDeshmukh29)
 
 **Stack:** Python · FastAPI · LangGraph · Next.js 15 · pgvector · Groq · Framer Motion · TanStack Query · Zustand
 
