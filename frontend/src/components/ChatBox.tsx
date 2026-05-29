@@ -8,23 +8,35 @@ import {
 
 import api from "../services/api";
 
-import { Message } from "../types/chat";
-
 import Sidebar from "./Sidebar";
 import Navbar from "./Navbar";
-import MessageBubble from "./MessageBubble";
-import TypingLoader from "./TypingLoader";
 import EmptyState from "./EmptyState";
+import TypingLoader from "./TypingLoader";
+import MessageBubble from "./MessageBubble";
+
+import { Message } from "../types/chat";
+
+import { useChatStore } from "../store/useChatStore";
 
 export default function ChatBox() {
 
-  const [messages, setMessages] = useState<Message[]>([]);
-
   const [input, setInput] = useState("");
 
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] =
+    useState(false);
 
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const bottomRef =
+    useRef<HTMLDivElement>(null);
+
+  const {
+    chats,
+    activeChatId,
+    addMessage,
+  } = useChatStore();
+
+  const activeChat = chats.find(
+    (chat) => chat.id === activeChatId
+  );
 
   useEffect(() => {
 
@@ -32,7 +44,7 @@ export default function ChatBox() {
       behavior: "smooth",
     });
 
-  }, [messages]);
+  }, [activeChat?.messages]);
 
   const sendMessage = async () => {
 
@@ -43,10 +55,7 @@ export default function ChatBox() {
       content: input,
     };
 
-    setMessages((prev) => [
-      ...prev,
-      userMessage,
-    ]);
+    addMessage(activeChatId, userMessage);
 
     setInput("");
 
@@ -54,19 +63,19 @@ export default function ChatBox() {
 
     try {
 
-      const res = await api.post("/chat", {
-        message: input,
-      });
+      const res = await api.post(
+        "/chat",
+        {
+          message: input,
+        }
+      );
 
       const aiMessage: Message = {
         role: "assistant",
         content: res.data.response,
       };
 
-      setMessages((prev) => [
-        ...prev,
-        aiMessage,
-      ]);
+      addMessage(activeChatId, aiMessage);
 
     } catch (error) {
 
@@ -89,22 +98,24 @@ export default function ChatBox() {
 
         <div className="flex-1 overflow-y-auto p-8 space-y-8">
 
-          {messages.length === 0 ? (
+          {!activeChat?.messages.length ? (
 
             <EmptyState />
 
           ) : (
 
             <>
-              {messages.map((msg, index) => (
+              {activeChat.messages.map(
+                (msg, index) => (
 
-                <MessageBubble
-                  key={index}
-                  role={msg.role}
-                  content={msg.content}
-                />
+                  <MessageBubble
+                    key={index}
+                    role={msg.role}
+                    content={msg.content}
+                  />
 
-              ))}
+                )
+              )}
 
               {loading && <TypingLoader />}
 

@@ -1,31 +1,49 @@
+"use client";
+
 import { Plus } from "lucide-react";
+
+import { useChatStore } from "../store/useChatStore";
 
 export default function Sidebar() {
 
+  const {
+    chats,
+    activeChatId,
+    createChat,
+    setActiveChat,
+  } = useChatStore();
+
   return (
-    <div className="w-[290px] bg-black/40 border-r border-white/10 backdrop-blur-xl p-5 flex flex-col">
+    <div className="w-[300px] bg-black/40 border-r border-white/10 backdrop-blur-xl p-5 flex flex-col">
 
-      <button className="flex items-center justify-center gap-2 bg-gradient-to-r from-purple-600 to-blue-600 p-4 rounded-2xl hover:scale-[1.02] transition-all duration-300 shadow-lg shadow-purple-500/20">
-
+      <button
+        onClick={createChat}
+        className="flex items-center justify-center gap-2 bg-gradient-to-r from-purple-600 to-blue-600 p-4 rounded-2xl hover:scale-[1.02] transition-all duration-300 shadow-lg shadow-purple-500/20"
+      >
         <Plus size={18} />
 
         New Chat
-
       </button>
 
-      <div className="mt-10 flex flex-col gap-3">
+      <div className="mt-10 flex flex-col gap-3 overflow-y-auto">
 
-        <div className="p-4 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/10 cursor-pointer transition-all">
+        {chats.map((chat) => (
 
-          AI Workspace Setup
+          <button
+            key={chat.id}
+            onClick={() =>
+              setActiveChat(chat.id)
+            }
+            className={`text-left p-4 rounded-2xl transition-all ${
+              activeChatId === chat.id
+                ? "bg-white/10 border border-white/10"
+                : "hover:bg-white/5"
+            }`}
+          >
+            {chat.title}
+          </button>
 
-        </div>
-
-        <div className="p-4 rounded-2xl hover:bg-white/5 cursor-pointer transition-all">
-
-          LangGraph Workflow
-
-        </div>
+        ))}
 
       </div>
 
