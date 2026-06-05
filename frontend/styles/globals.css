@@ -1,0 +1,167 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ========================
+   Design Token System
+   AI Multi-Agent Workspace
+   ======================== */
+
+@layer base {
+  :root {
+    /* --- Light Mode (we'll default to dark) --- */
+    --background: 0 0% 100%;
+    --foreground: 224 71% 4%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 224 71% 4%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 224 71% 4%;
+
+    --primary: 220 90% 56%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 220 14% 96%;
+    --secondary-foreground: 220 9% 46%;
+
+    --muted: 220 14% 96%;
+    --muted-foreground: 220 9% 46%;
+
+    --accent: 220 14% 96%;
+    --accent-foreground: 220 9% 46%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
+    --ring: 220 90% 56%;
+
+    --radius: 0.75rem;
+
+    /* --- Agent Colors (light) --- */
+    --agent-qa: 220 90% 56%;
+    --agent-research: 142 76% 36%;
+    --agent-engineering: 38 92% 50%;
+    --agent-innovation: 280 87% 65%;
+    --agent-critic: 0 84% 60%;
+    --agent-planner: 199 89% 48%;
+  }
+
+  .dark {
+    /* --- Dark Mode --- */
+    --background: 224 71% 4%;
+    --foreground: 213 31% 91%;
+
+    --card: 222 47% 7%;
+    --card-foreground: 213 31% 91%;
+
+    --popover: 222 47% 7%;
+    --popover-foreground: 213 31% 91%;
+
+    --primary: 217 91% 60%;
+    --primary-foreground: 224 71% 4%;
+
+    --secondary: 222 47% 11%;
+    --secondary-foreground: 215 20% 65%;
+
+    --muted: 222 47% 11%;
+    --muted-foreground: 215 20% 65%;
+
+    --accent: 222 47% 11%;
+    --accent-foreground: 213 31% 91%;
+
+    --destructive: 0 63% 31%;
+    --destructive-foreground: 213 31% 91%;
+
+    --border: 216 34% 17%;
+    --input: 216 34% 17%;
+    --ring: 217 91% 60%;
+
+    /* --- Agent Colors (dark) --- */
+    --agent-qa: 217 91% 60%;
+    --agent-research: 142 69% 58%;
+    --agent-engineering: 38 95% 64%;
+    --agent-innovation: 280 87% 75%;
+    --agent-critic: 0 90% 70%;
+    --agent-planner: 199 95% 63%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html {
+    @apply dark; /* Default to dark mode */
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+
+  /* Smooth scrolling */
+  html {
+    scroll-behavior: smooth;
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-border rounded-full;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-muted-foreground;
+  }
+}
+
+@layer utilities {
+  /* Agent glow effects */
+  .glow-qa {
+    box-shadow: 0 0 20px hsl(var(--agent-qa) / 0.3);
+  }
+  .glow-research {
+    box-shadow: 0 0 20px hsl(var(--agent-research) / 0.3);
+  }
+  .glow-engineering {
+    box-shadow: 0 0 20px hsl(var(--agent-engineering) / 0.3);
+  }
+  .glow-innovation {
+    box-shadow: 0 0 20px hsl(var(--agent-innovation) / 0.3);
+  }
+  .glow-critic {
+    box-shadow: 0 0 20px hsl(var(--agent-critic) / 0.3);
+  }
+  .glow-planner {
+    box-shadow: 0 0 20px hsl(var(--agent-planner) / 0.3);
+  }
+
+  /* Gradient text */
+  .gradient-text {
+    @apply bg-gradient-to-r from-blue-400 via-violet-400 to-cyan-400 bg-clip-text text-transparent;
+  }
+
+  /* Glass effect for cards */
+  .glass {
+    backdrop-filter: blur(12px);
+    background: hsl(var(--card) / 0.8);
+    border: 1px solid hsl(var(--border) / 0.5);
+  }
+
+  /* Agent thinking animation */
+  .agent-pulse {
+    animation: agentThinking 1.5s ease-in-out infinite;
+  }
+}

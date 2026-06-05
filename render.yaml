@@ -1,0 +1,75 @@
+# ================================================================
+# render.yaml — Render.com deployment configuration
+# Push to GitHub → Render auto-deploys on every push to main
+# No Docker needed — Render handles Python environment natively
+# ================================================================
+
+services:
+  - type: web
+    name: ai-workspace-backend
+    runtime: python
+    region: oregon                    # cheapest + fast US-West
+
+    rootDir: backend
+
+    # Install all Python dependencies
+    buildCommand: |
+      pip install --upgrade pip
+      pip install -r requirements.txt
+
+    # Start FastAPI with Gunicorn + Uvicorn workers (production)
+    # Use $PORT — Render injects this automatically
+    startCommand: gunicorn app.main:app -w 2 -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:$PORT --timeout 120
+
+    # Render pings this every 30s — if it returns non-200, the service restarts
+    healthCheckPath: /health
+
+    # Auto-deploy on push to main branch
+    autoDeploy: true
+
+    # Environment variables — set values in Render dashboard
+    # Never put real secrets here (this file is in git)
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+
+      - key: DEBUG
+        value: "False"
+
+      - key: ALLOWED_ORIGINS
+        value: https://your-app.vercel.app   # Update after Vercel deploy
+
+      # Set these in Render dashboard → Environment tab:
+      - key: DATABASE_URL
+        sync: false         # postgresql+asyncpg://...
+
+      - key: DATABASE_URL_SYNC
+        sync: false         # postgresql://...
+
+      - key: JWT_SECRET_KEY
+        sync: false         # openssl rand -hex 32
+
+      - key: JWT_ALGORITHM
+        value: HS256
+
+      - key: JWT_ACCESS_TOKEN_EXPIRE_MINUTES
+        value: "60"
+
+      - key: JWT_REFRESH_TOKEN_EXPIRE_DAYS
+        value: "30"
+
+      - key: GROQ_API_KEY
+        sync: false         # gsk_...
+
+      - key: GROQ_MODEL
+        value: llama-3.3-70b-versatile
+
+      - key: EMBEDDING_MODEL
+        value: all-MiniLM-L6-v2
+
+      - key: EMBEDDING_DIMENSIONS
+        value: "384"
+
+      # Optional — leave empty if not using web search
+      - key: SERPER_API_KEY
+        sync: false
