@@ -19,14 +19,28 @@ export function useAuth() {
   const router = useRouter();
   const { user, isAuthenticated, isLoading, setUser, setTokens, logout: clearAuth, setLoading } = useAuthStore();
 
+  // Helper: set cookie so Next.js middleware can read token server-side
+  const setCookieToken = (token: string) => {
+    if (typeof document !== "undefined") {
+      // Secure, SameSite=Lax, 1 day expiry
+      document.cookie = `access_token=${token}; path=/; max-age=86400; SameSite=Lax`;
+    }
+  };
+
+  const clearCookieToken = () => {
+    if (typeof document !== "undefined") {
+      document.cookie = "access_token=; path=/; max-age=0";
+    }
+  };
+
   // ── LOGIN ──────────────────────────────
   const login = useCallback(async (data: LoginRequest) => {
     setLoading(true);
     try {
       const tokens = await authService.login(data);
       setTokens(tokens.access_token, tokens.refresh_token);
+      setCookieToken(tokens.access_token); // ← cookie for middleware
 
-      // Fetch user profile after getting tokens
       const me = await authService.getMe();
       setUser(me);
 
@@ -47,6 +61,7 @@ export function useAuth() {
     try {
       const tokens = await authService.signup(data);
       setTokens(tokens.access_token, tokens.refresh_token);
+      setCookieToken(tokens.access_token); // ← cookie for middleware
 
       const me = await authService.getMe();
       setUser(me);
@@ -65,6 +80,7 @@ export function useAuth() {
   // ── LOGOUT ─────────────────────────────
   const logout = useCallback(() => {
     authService.logout();
+    clearCookieToken();
     clearAuth();
     router.push("/auth/login");
     toast.info("Logged out successfully");

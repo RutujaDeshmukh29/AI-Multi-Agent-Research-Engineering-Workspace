@@ -73,16 +73,13 @@ async def get_db() -> AsyncSession:  # type: ignore[return]
 async def init_db() -> None:
     """
     On startup:
-    1. Enable pgvector extension (if using PostgreSQL)
+    1. Enable pgvector extension (needed once per DB)
     2. Create all tables from SQLAlchemy models
     """
     async with engine.begin() as conn:
-        # For PostgreSQL, enable pgvector extension
-        if settings.DATABASE_URL.startswith("postgresql"):
-            await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
-            logger.info("✅ pgvector extension enabled")
-        else:
-            logger.info("ⓘ Skipping pgvector setup (not using PostgreSQL)")
+        # Enable pgvector — safe to run multiple times (IF NOT EXISTS)
+        await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
+        logger.info("✅ pgvector extension enabled")
 
         # Import all models so Base knows about them before create_all
         from app.database.models import User, Project, Session, Message, UserMemory, SessionMemory  # noqa: F401

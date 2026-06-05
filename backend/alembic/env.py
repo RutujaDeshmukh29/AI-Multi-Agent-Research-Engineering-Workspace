@@ -18,7 +18,10 @@ from app.config import settings
 from app.database.db import Base
 
 # Import ALL models so Alembic can see them for autogenerate
-from app.database.models import User, Project, Session, Message, UserMemory, SessionMemory  # noqa: F401
+from app.database.models import (  # noqa: F401
+    User, Project, Session, Message, UserMemory, SessionMemory,
+    VoiceSession, VoiceMessage, ProjectRoadmap, RoadmapTask,
+)
 
 config = context.config
 
