@@ -15,6 +15,7 @@
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.dialects.postgresql import insert
 from typing import Optional
 import uuid
 import structlog
@@ -41,10 +42,18 @@ async def get_or_create_session_memory(
     memory = result.scalar_one_or_none()
 
     if memory is None:
-        memory = SessionMemory(session_id=session_id)
-        db.add(memory)
-        await db.flush()
-        await db.refresh(memory)
+        stmt = (
+            insert(SessionMemory)
+            .values(session_id=session_id)
+            .on_conflict_do_nothing(index_elements=["session_id"])
+            .returning(SessionMemory.id)
+        )
+        await db.execute(stmt)
+
+        result = await db.execute(
+            select(SessionMemory).where(SessionMemory.session_id == session_id)
+        )
+        memory = result.scalar_one()
 
     return memory
 

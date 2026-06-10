@@ -1,7 +1,7 @@
 "use client";
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { streamChat } from "@/services/chatService";
+import { useMessages } from "@/hooks/useProjects";
 
 export type AgentEvent = {
   agent: string;
@@ -18,7 +18,9 @@ export type Message = {
   created_at: string;
 };
 
-export function useChat(projectId: string | null, sessionId: string | null) {
+export function useChat(projectId: string | null, currentSessionId: string | null) {
+  console.log("--- useChat hook initialized/re-rendered ---", { projectId, currentSessionId });
+  const { data: initialMessages, isLoading, isFetching } = useMessages(projectId, currentSessionId);
   const [messages, setMessages] = useState<Message[]>([]);
   const [agentEvents, setAgentEvents] = useState<AgentEvent[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
@@ -27,17 +29,28 @@ export function useChat(projectId: string | null, sessionId: string | null) {
   const abortRef = useRef<(() => void) | null>(null);
   const qc = useQueryClient();
 
-  const loadMessages = useCallback((msgs: Message[]) => {
-    setMessages(msgs);
-  }, []);
+  useEffect(() => {
+    console.log("useChat: initialMessages effect fired", { initialMessages, isLoading });
+    if (isStreaming || isFetching) return;
+    if (initialMessages) {
+      setMessages(initialMessages);
+    } else if (!isLoading) {
+      setMessages([]);
+    }
+  }, [initialMessages, isLoading, isFetching, isStreaming]);
 
   const sendMessage = useCallback(async (
     content: string,
-    inputMode: "text" | "voice" = "text"
+    inputMode: "text" | "voice" = "text",
+    sessionIdOverride: string | null = null,
   ) => {
-    if (!projectId || !sessionId || isStreaming) return;
+    console.log("sendMessage: Called", { content, currentSessionId, sessionIdOverride });
+    const sessionId = sessionIdOverride || currentSessionId;
+    if (!projectId || !sessionId || isStreaming) {
+      console.warn("sendMessage: Aborted", { projectId, sessionId, isStreaming });
+      return;
+    }
 
-    // Add user message immediately (optimistic)
     const userMsg: Message = {
       id: `temp-${Date.now()}`,
       role: "user",
@@ -45,57 +58,27 @@ export function useChat(projectId: string | null, sessionId: string | null) {
       input_mode: inputMode,
       created_at: new Date().toISOString(),
     };
+    console.log("sendMessage: Adding optimistic user message");
     setMessages(prev => [...prev, userMsg]);
     setAgentEvents([]);
     setStreamingText("");
     setIsStreaming(true);
 
-    // Placeholder for assistant response
     const assistantPlaceholder: Message = {
       id: `streaming-${Date.now()}`,
       role: "assistant",
       content: "",
       created_at: new Date().toISOString(),
     };
+    console.log("sendMessage: Adding optimistic assistant placeholder");
     setMessages(prev => [...prev, assistantPlaceholder]);
 
-    const abort = streamChat(
-      content, sessionId, projectId,
-      // onEvent — agent progress updates
-      (event) => {
-        if (event.type === "agent_update") {
-          setAgentEvents(prev => {
-            const filtered = prev.filter(e => !(e.agent === event.agent && e.status === "thinking"));
-            return [...filtered, { agent: event.agent, status: event.status, message: event.message }];
-          });
-        }
-      },
-      // onError
-      (err) => {
-        setIsStreaming(false);
-        setMessages(prev => prev.map(m =>
-          m.id === assistantPlaceholder.id
-            ? { ...m, content: `Error: ${err.message}` }
-            : m
-        ));
-      },
-      // onDone
-      (data) => {
-        setIsStreaming(false);
-        if (data.roadmap) setRoadmap(data.roadmap);
-        qc.invalidateQueries({ queryKey: ["messages", sessionId] });
-        qc.invalidateQueries({ queryKey: ["sessions", projectId] });
-      }
-    );
-
-    abortRef.current = abort;
-
-    // Also hook into the raw SSE stream for streaming text display
-    // We re-implement a minimal fetch stream listener here for the content
+    abortRef.current = null;
     const token = typeof window !== "undefined" ? localStorage.getItem("access_token") : null;
     const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
     try {
+      console.log("sendMessage: Starting fetch stream");
       const controller = new AbortController();
       abortRef.current = () => controller.abort();
 
@@ -110,11 +93,13 @@ export function useChat(projectId: string | null, sessionId: string | null) {
       const reader = res.body.getReader();
       const dec = new TextDecoder();
       let buf = "";
-      let fullContent = "";
 
       while (true) {
         const { done, value } = await reader.read();
-        if (done) break;
+        if (done) {
+          console.log("sendMessage: Stream finished");
+          break;
+        }
         buf += dec.decode(value, { stream: true });
         const lines = buf.split("\n");
         buf = lines.pop() || "";
@@ -123,35 +108,39 @@ export function useChat(projectId: string | null, sessionId: string | null) {
           if (!line.startsWith("data: ")) continue;
           try {
             const ev = JSON.parse(line.slice(6));
+            console.log("sendMessage: Received stream event", ev);
             if (ev.type === "agent_update") {
               setAgentEvents(prev => {
                 const filtered = prev.filter(e => !(e.agent === ev.agent && e.status === "thinking"));
                 return [...filtered, { agent: ev.agent, status: ev.status, message: ev.message }];
               });
             } else if (ev.type === "final") {
-              fullContent = ev.content || "";
               if (ev.roadmap) setRoadmap(ev.roadmap);
               setMessages(prev => prev.map(m =>
                 m.id === assistantPlaceholder.id
-                  ? { ...m, content: fullContent, agent_outputs: ev.agent_outputs }
+                  ? { ...m, content: ev.content || "", agent_outputs: ev.agent_outputs, id: ev.message_id || m.id }
                   : m
               ));
             } else if (ev.type === "done") {
+              if (ev.message_id) {
+                setMessages(prev => prev.map(m =>
+                  m.id === assistantPlaceholder.id ? { ...m, id: ev.message_id } : m
+                ));
+              }
               setIsStreaming(false);
-              qc.invalidateQueries({ queryKey: ["messages", sessionId] });
+              qc.invalidateQueries({ queryKey: ["messages", projectId, sessionId] });
               qc.invalidateQueries({ queryKey: ["sessions", projectId] });
             } else if (ev.type === "error") {
               setIsStreaming(false);
               setMessages(prev => prev.map(m =>
-                m.id === assistantPlaceholder.id
-                  ? { ...m, content: `⚠️ ${ev.message}` }
-                  : m
+                m.id === assistantPlaceholder.id ? { ...m, content: `⚠️ ${ev.message}` } : m
               ));
             }
-          } catch { /* ignore parse errors */ }
+          } catch (e) { console.error("sendMessage: Error parsing stream event", e); }
         }
       }
     } catch (err: any) {
+      console.error("sendMessage: Fetch stream error", err);
       if (err?.name !== "AbortError") {
         setIsStreaming(false);
         setMessages(prev => prev.map(m =>
@@ -161,7 +150,7 @@ export function useChat(projectId: string | null, sessionId: string | null) {
         ));
       }
     }
-  }, [projectId, sessionId, isStreaming, qc]);
+  }, [projectId, currentSessionId, isStreaming, qc]);
 
   const stopStreaming = useCallback(() => {
     abortRef.current?.();
@@ -171,7 +160,7 @@ export function useChat(projectId: string | null, sessionId: string | null) {
   return {
     messages, agentEvents, isStreaming,
     streamingText, roadmap,
-    sendMessage, loadMessages, stopStreaming,
+    sendMessage, stopStreaming,
     setMessages,
   };
 }

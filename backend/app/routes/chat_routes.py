@@ -53,6 +53,10 @@ async def chat_stream(
         title = body.message[:60] + ("..." if len(body.message) > 60 else "")
         await crud.update_session_title(db, session_id, user.id, title)
 
+    # Do not keep the user message in a transaction during the long SSE/LLM run.
+    # If later memory writes timeout, the user's prompt must still be durable.
+    await db.commit()
+
     async def event_generator():
         agent_outputs_collected = {}
         final_content = ""
@@ -84,16 +88,29 @@ async def chat_stream(
                     db, session_id=session_id, role="assistant",
                     content=final_content, agent_outputs=agent_outputs_collected,
                 )
+                await db.commit()
+                await db.refresh(assistant_msg)
+
                 if roadmap_data:
-                    await _save_roadmap(db, project_id, user.id, roadmap_data, session_id)
+                    try:
+                        await _save_roadmap(db, project_id, user.id, roadmap_data, session_id)
+                        await db.commit()
+                    except Exception as e:
+                        await db.rollback()
+                        logger.error("Roadmap save failed", error=str(e))
 
-                all_messages = await crud.get_messages_by_session(db, session_id)
-                await update_session_memory(db, session_id, all_messages)
+                try:
+                    all_messages = await crud.get_messages_by_session(db, session_id)
+                    await update_session_memory(db, session_id, all_messages)
 
-                if len(all_messages) % 10 == 0:
-                    mem = await get_or_create_session_memory(db, session_id)
-                    if mem.summary:
-                        await save_session_to_memory(db, user.id, session_id, mem.summary, mem.topics)
+                    if len(all_messages) % 10 == 0:
+                        mem = await get_or_create_session_memory(db, session_id)
+                        if mem.summary:
+                            await save_session_to_memory(db, user.id, session_id, mem.summary, mem.topics)
+                    await db.commit()
+                except Exception as e:
+                    await db.rollback()
+                    logger.error("Session memory update failed", error=str(e))
 
             yield f"data: {json.dumps({'type': 'done', 'message_id': str(assistant_msg.id) if assistant_msg else None, 'roadmap': roadmap_data})}\n\n"
 

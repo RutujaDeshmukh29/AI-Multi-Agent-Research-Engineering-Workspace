@@ -295,8 +295,24 @@ venv\Scripts\activate
 # Install all dependencies (~3-5 minutes, downloads ML models)
 pip install --upgrade pip
 pip install -r requirements.txt
-alembic revision --autogenerate -m "add preferences to user"
-alembic upgrade head
+
+# --- Database Migrations (CRITICAL) ---
+# Run these commands to manage your database schema.
+# Ensure your virtual environment is activated before running Alembic commands.
+
+# 1. Generate a new migration script (only when models.py changes):
+#    Mac/Linux: `source venv/bin/activate && alembic revision --autogenerate -m "Descriptive message"`
+#    Windows: `.\venv\Scripts\Activate.ps1; alembic revision --autogenerate -m "Descriptive message"`
+
+# 2. Apply all pending migrations to your database (after generating or on new setup):
+#    Mac/Linux: `source venv/bin/activate && alembic upgrade head`
+#    Windows: `.\venv\Scripts\Activate.ps1; alembic upgrade head`
+
+# Example for adding preferences to user (if you just cloned and this is your first migration):
+# Mac/Linux: source venv/bin/activate && alembic revision --autogenerate -m "Add preferences to user"
+# Mac/Linux: source venv/bin/activate && alembic upgrade head
+# Windows: .\venv\Scripts\Activate.ps1; alembic revision --autogenerate -m "Add preferences to user"
+# Windows: .\venv\Scripts\Activate.ps1; alembic upgrade head
 ```
 
 **Configure your environment:**

@@ -110,6 +110,7 @@ async def create_project(
     if body.icon:
         project.icon = body.icon
     await db.flush()
+    await db.refresh(project) # Refresh the project object to load all attributes
 
     return ProjectResponse(
         id=str(project.id), name=project.name, description=project.description,

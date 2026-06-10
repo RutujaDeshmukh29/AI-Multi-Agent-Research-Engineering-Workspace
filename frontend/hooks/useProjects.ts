@@ -26,7 +26,7 @@ export function useSessions(projectId: string | null) {
 export function useMessages(projectId: string | null, sessionId: string | null) {
   const { isAuthenticated } = useAuthStore();
   return useQuery({
-    queryKey: ["messages", sessionId],
+    queryKey: ["messages", projectId, sessionId],
     queryFn: () => projectService.getMessages(projectId!, sessionId!),
     enabled: isAuthenticated && !!projectId && !!sessionId,
     staleTime: 0,

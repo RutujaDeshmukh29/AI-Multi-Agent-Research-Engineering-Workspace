@@ -40,6 +40,7 @@ type RightTab = "roadmap" | "memory" | "graph";
 
 // ================================================================
 export default function WorkspacePage() {
+  console.log("--- WorkspacePage rendered ---");
   const params    = useParams();
   const router    = useRouter();
   const projectId = params?.id as string;
@@ -48,6 +49,7 @@ export default function WorkspacePage() {
 
   // UI state
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+  console.log("WorkspacePage state: activeSessionId", activeSessionId);
   const [sidebarOpen,     setSidebarOpen]     = useState(true);
   const [rightPanelOpen,  setRightPanelOpen]  = useState(false);
   const [rightTab,        setRightTab]        = useState<RightTab>("roadmap");
@@ -70,21 +72,16 @@ export default function WorkspacePage() {
   const deleteSession            = useDeleteSession();
   const renameSession            = useRenameSession();
 
-  const { messages, agentEvents, isStreaming, sendMessage, loadMessages } =
+  const { messages, agentEvents, isStreaming, sendMessage, setMessages } =
     useChat(projectId, activeSessionId);
+  console.log("WorkspacePage state: messages count", messages.length);
 
-  const { data: initialMessages } = useMessages(projectId, activeSessionId);
 
   // Command palette
   const { open: cmdOpen, setOpen: setCmdOpen } = useCommandPalette();
 
   // ── Effects ────────────────────────────────────────────────────
   useEffect(() => { if (!isAuthenticated) router.push("/auth/login"); }, [isAuthenticated, router]);
-
-  useEffect(() => {
-    if (initialMessages?.length) loadMessages(initialMessages);
-    else if (activeSessionId) loadMessages([]);
-  }, [initialMessages, activeSessionId]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -119,20 +116,23 @@ export default function WorkspacePage() {
     if (!projectId) return;
     const s = await createSession.mutateAsync({ projectId, data: { title: "New Chat" } });
     setActiveSessionId(s.id);
-    loadMessages([]);
   };
-
   const handleSend = async () => {
+    console.log("handleSend: Called");
     const msg = inputValue.trim();
     if (!msg || isStreaming) return;
-    if (!activeSessionId) {
-      const s = await createSession.mutateAsync({ projectId, data: { title: msg.slice(0, 50) } });
-      setActiveSessionId(s.id);
-      await new Promise(r => setTimeout(r, 80));
-    }
+    
     setInputValue("");
     setLastQuery(msg);
-    await sendMessage(msg, isVoice ? "voice" : "text");
+
+    if (!activeSessionId) {
+      console.log("handleSend: No active session, creating new one...");
+      const s = await createSession.mutateAsync({ projectId, data: { title: msg.slice(0, 50) } });
+      setActiveSessionId(s.id); 
+      await sendMessage(msg, isVoice ? "voice" : "text", s.id);
+    } else {
+      await sendMessage(msg, isVoice ? "voice" : "text");
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -239,7 +239,7 @@ export default function WorkspacePage() {
                   <div className="absolute right-1.5 top-1/2 -translate-y-1/2 hidden group-hover:flex gap-0.5">
                     <button onClick={() => { setRenameId(s.id); setRenameVal(s.title); }}
                       className="w-5 h-5 rounded flex items-center justify-center text-[9px] text-white/30 hover:text-white/60 hover:bg-white/10 transition-all">✏</button>
-                    <button onClick={async () => { await deleteSession.mutateAsync({ projectId, sessionId: s.id }); if (activeSessionId === s.id) { setActiveSessionId(null); loadMessages([]); } }}
+                    <button onClick={async () => { await deleteSession.mutateAsync({ projectId, sessionId: s.id }); if (activeSessionId === s.id) { setActiveSessionId(null); setMessages([]); } }}
                       className="w-5 h-5 rounded flex items-center justify-center text-[9px] text-white/30 hover:text-red-400 hover:bg-red-500/10 transition-all">✕</button>
                   </div>
                 </div>
