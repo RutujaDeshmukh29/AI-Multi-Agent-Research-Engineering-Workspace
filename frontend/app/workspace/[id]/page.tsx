@@ -10,6 +10,7 @@ import { useParams, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { toast } from "sonner";
 
 import { useAuthStore } from "@/store/authStore";
 import {
@@ -40,7 +41,6 @@ type RightTab = "roadmap" | "memory" | "graph";
 
 // ================================================================
 export default function WorkspacePage() {
-  console.log("--- WorkspacePage rendered ---");
   const params    = useParams();
   const router    = useRouter();
   const projectId = params?.id as string;
@@ -49,7 +49,6 @@ export default function WorkspacePage() {
 
   // UI state
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
-  console.log("WorkspacePage state: activeSessionId", activeSessionId);
   const [sidebarOpen,     setSidebarOpen]     = useState(true);
   const [rightPanelOpen,  setRightPanelOpen]  = useState(false);
   const [rightTab,        setRightTab]        = useState<RightTab>("roadmap");
@@ -74,7 +73,6 @@ export default function WorkspacePage() {
 
   const { messages, agentEvents, isStreaming, sendMessage, setMessages } =
     useChat(projectId, activeSessionId);
-  console.log("WorkspacePage state: messages count", messages.length);
 
 
   // Command palette
@@ -114,24 +112,37 @@ export default function WorkspacePage() {
   // ── Actions ────────────────────────────────────────────────────
   const handleNewSession = async () => {
     if (!projectId) return;
-    const s = await createSession.mutateAsync({ projectId, data: { title: "New Chat" } });
-    setActiveSessionId(s.id);
+
+    try {
+      const s = await createSession.mutateAsync({ projectId, data: { title: "New Chat" } });
+      setActiveSessionId(s.id);
+    } catch (err) {
+      console.error("Failed to create new session", err);
+      toast.error("Unable to create a new chat. Try again.");
+    }
   };
+
   const handleSend = async () => {
-    console.log("handleSend: Called");
     const msg = inputValue.trim();
     if (!msg || isStreaming) return;
-    
+
     setInputValue("");
     setLastQuery(msg);
 
-    if (!activeSessionId) {
-      console.log("handleSend: No active session, creating new one...");
-      const s = await createSession.mutateAsync({ projectId, data: { title: msg.slice(0, 50) } });
-      setActiveSessionId(s.id); 
-      await sendMessage(msg, isVoice ? "voice" : "text", s.id);
-    } else {
-      await sendMessage(msg, isVoice ? "voice" : "text");
+    try {
+      let sessionId = activeSessionId;
+      if (!sessionId) {
+        const s = await createSession.mutateAsync({ projectId, data: { title: msg.slice(0, 50) } });
+        sessionId = s.id;
+        setActiveSessionId(s.id);
+      }
+
+      if (sessionId) {
+        await sendMessage(msg, isVoice ? "voice" : "text", sessionId);
+      }
+    } catch (err) {
+      console.error("Failed to send chat message", err);
+      toast.error("Unable to send message. Please try again.");
     }
   };
 
@@ -140,9 +151,14 @@ export default function WorkspacePage() {
   };
 
   const handleTaskToggle = async (taskId: string, completed: boolean) => {
-    await updateTask(taskId, completed);
-    const d = await getRoadmap(projectId);
-    if (d?.roadmap) setRoadmapData(d.roadmap);
+    try {
+      await updateTask(taskId, completed);
+      const d = await getRoadmap(projectId);
+      if (d?.roadmap) setRoadmapData(d.roadmap);
+    } catch (err) {
+      console.error("Failed to update roadmap task", err);
+      toast.error("Unable to update task. Please try again.");
+    }
   };
 
   const openRight = (tab: RightTab) => {
@@ -221,8 +237,16 @@ export default function WorkspacePage() {
                   {renameId === s.id ? (
                     <input autoFocus value={renameVal} onChange={e => setRenameVal(e.target.value)}
                       onBlur={async () => {
-                        if (renameVal.trim()) await renameSession.mutateAsync({ projectId, sessionId: s.id, title: renameVal });
-                        setRenameId(null);
+                        try {
+                          if (renameVal.trim()) {
+                            await renameSession.mutateAsync({ projectId, sessionId: s.id, title: renameVal });
+                          }
+                        } catch (err) {
+                          console.error("Failed to rename session", err);
+                          toast.error("Unable to rename chat. Please try again.");
+                        } finally {
+                          setRenameId(null);
+                        }
                       }}
                       onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); if (e.key === "Escape") setRenameId(null); }}
                       className="w-full px-2.5 py-2 bg-violet-500/10 border border-violet-500/30 rounded-lg text-[12px] text-white/80 outline-none" />
@@ -239,7 +263,18 @@ export default function WorkspacePage() {
                   <div className="absolute right-1.5 top-1/2 -translate-y-1/2 hidden group-hover:flex gap-0.5">
                     <button onClick={() => { setRenameId(s.id); setRenameVal(s.title); }}
                       className="w-5 h-5 rounded flex items-center justify-center text-[9px] text-white/30 hover:text-white/60 hover:bg-white/10 transition-all">✏</button>
-                    <button onClick={async () => { await deleteSession.mutateAsync({ projectId, sessionId: s.id }); if (activeSessionId === s.id) { setActiveSessionId(null); setMessages([]); } }}
+                    <button onClick={async () => {
+                      try {
+                        await deleteSession.mutateAsync({ projectId, sessionId: s.id });
+                        if (activeSessionId === s.id) {
+                          setActiveSessionId(null);
+                          setMessages([]);
+                        }
+                      } catch (err) {
+                        console.error("Failed to delete session", err);
+                        toast.error("Unable to delete chat. Please try again.");
+                      }
+                    }}
                       className="w-5 h-5 rounded flex items-center justify-center text-[9px] text-white/30 hover:text-red-400 hover:bg-red-500/10 transition-all">✕</button>
                   </div>
                 </div>

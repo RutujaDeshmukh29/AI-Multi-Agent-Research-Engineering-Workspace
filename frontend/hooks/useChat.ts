@@ -19,7 +19,6 @@ export type Message = {
 };
 
 export function useChat(projectId: string | null, currentSessionId: string | null) {
-  console.log("--- useChat hook initialized/re-rendered ---", { projectId, currentSessionId });
   const { data: initialMessages, isLoading, isFetching } = useMessages(projectId, currentSessionId);
   const [messages, setMessages] = useState<Message[]>([]);
   const [agentEvents, setAgentEvents] = useState<AgentEvent[]>([]);
@@ -30,7 +29,6 @@ export function useChat(projectId: string | null, currentSessionId: string | nul
   const qc = useQueryClient();
 
   useEffect(() => {
-    console.log("useChat: initialMessages effect fired", { initialMessages, isLoading });
     if (isStreaming || isFetching) return;
     if (initialMessages) {
       setMessages(initialMessages);
@@ -44,10 +42,8 @@ export function useChat(projectId: string | null, currentSessionId: string | nul
     inputMode: "text" | "voice" = "text",
     sessionIdOverride: string | null = null,
   ) => {
-    console.log("sendMessage: Called", { content, currentSessionId, sessionIdOverride });
     const sessionId = sessionIdOverride || currentSessionId;
     if (!projectId || !sessionId || isStreaming) {
-      console.warn("sendMessage: Aborted", { projectId, sessionId, isStreaming });
       return;
     }
 
@@ -58,7 +54,6 @@ export function useChat(projectId: string | null, currentSessionId: string | nul
       input_mode: inputMode,
       created_at: new Date().toISOString(),
     };
-    console.log("sendMessage: Adding optimistic user message");
     setMessages(prev => [...prev, userMsg]);
     setAgentEvents([]);
     setStreamingText("");
@@ -70,15 +65,13 @@ export function useChat(projectId: string | null, currentSessionId: string | nul
       content: "",
       created_at: new Date().toISOString(),
     };
-    console.log("sendMessage: Adding optimistic assistant placeholder");
     setMessages(prev => [...prev, assistantPlaceholder]);
 
     abortRef.current = null;
     const token = typeof window !== "undefined" ? localStorage.getItem("access_token") : null;
-    const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+    const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
     try {
-      console.log("sendMessage: Starting fetch stream");
       const controller = new AbortController();
       abortRef.current = () => controller.abort();
 
@@ -89,6 +82,7 @@ export function useChat(projectId: string | null, currentSessionId: string | nul
         signal: controller.signal,
       });
 
+      if (!res.ok) throw new Error(`Chat stream failed (${res.status})`);
       if (!res.body) throw new Error("No stream");
       const reader = res.body.getReader();
       const dec = new TextDecoder();
@@ -97,7 +91,6 @@ export function useChat(projectId: string | null, currentSessionId: string | nul
       while (true) {
         const { done, value } = await reader.read();
         if (done) {
-          console.log("sendMessage: Stream finished");
           break;
         }
         buf += dec.decode(value, { stream: true });
@@ -108,7 +101,6 @@ export function useChat(projectId: string | null, currentSessionId: string | nul
           if (!line.startsWith("data: ")) continue;
           try {
             const ev = JSON.parse(line.slice(6));
-            console.log("sendMessage: Received stream event", ev);
             if (ev.type === "agent_update") {
               setAgentEvents(prev => {
                 const filtered = prev.filter(e => !(e.agent === ev.agent && e.status === "thinking"));
@@ -136,11 +128,12 @@ export function useChat(projectId: string | null, currentSessionId: string | nul
                 m.id === assistantPlaceholder.id ? { ...m, content: `⚠️ ${ev.message}` } : m
               ));
             }
-          } catch (e) { console.error("sendMessage: Error parsing stream event", e); }
+          } catch {
+            // Ignore malformed SSE fragments; the next chunk may complete the event.
+          }
         }
       }
     } catch (err: any) {
-      console.error("sendMessage: Fetch stream error", err);
       if (err?.name !== "AbortError") {
         setIsStreaming(false);
         setMessages(prev => prev.map(m =>
