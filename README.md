@@ -295,6 +295,8 @@ venv\Scripts\activate
 # Install all dependencies (~3-5 minutes, downloads ML models)
 pip install --upgrade pip
 pip install -r requirements.txt
+alembic revision --autogenerate -m "add preferences to user"
+alembic upgrade head
 ```
 
 **Configure your environment:**
