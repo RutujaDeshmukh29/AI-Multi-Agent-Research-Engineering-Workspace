@@ -1,88 +1,11 @@
 "use client";
-// app/auth/signup/page.tsx
-import { useState } from "react";
-import Link from "next/link";
-import { motion } from "framer-motion";
-import { useAuth } from "@/hooks/useAuth";
 
-export default function SignupPage() {
-  const { signup, isLoading } = useAuth();
-  const [name, setName]         = useState("");
-  const [email, setEmail]       = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError]       = useState("");
+import type { ReactNode } from "react";
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setError("");
-    if (password.length < 8) { setError("Password must be at least 8 characters."); return; }
-    try { await signup({ name, email, password }); }
-    catch (err: any) {
-      setError(err?.response?.data?.detail || "Could not create account. Email may already be in use.");
-    }
-  }
+interface AuthLayoutProps {
+  children: ReactNode;
+}
 
-  return (
-    <div className="min-h-screen bg-[#080910] flex items-center justify-center p-4">
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[400px] bg-violet-600/8 rounded-full blur-[120px]" />
-      </div>
-
-      <motion.div
-        initial={{ opacity: 0, y: 24 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4, ease: "easeOut" }}
-        className="w-full max-w-sm relative"
-      >
-        <div className="text-center mb-8">
-          <div className="inline-flex w-12 h-12 rounded-2xl bg-gradient-to-br from-violet-500 to-indigo-600 items-center justify-center text-xl font-bold mb-4 shadow-lg shadow-violet-500/20">✦</div>
-          <h1 className="text-[22px] font-bold text-white/85 tracking-tight">AI Workspace</h1>
-          <p className="text-[13px] text-white/35 mt-1">Create your workspace account</p>
-        </div>
-
-        <div className="bg-[#0d0e16] border border-white/[0.08] rounded-2xl p-7 shadow-2xl">
-          {error && (
-            <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}
-              className="bg-red-500/8 border border-red-500/20 text-red-400 text-[12.5px] rounded-xl px-4 py-3 mb-5">
-              {error}
-            </motion.div>
-          )}
-
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="text-[11px] text-white/40 font-medium uppercase tracking-wider block mb-1.5">Name</label>
-              <input type="text" required value={name} onChange={e => setName(e.target.value)}
-                placeholder="Rutuja" autoComplete="name"
-                className="w-full bg-white/[0.04] border border-white/[0.09] rounded-xl px-4 py-2.5 text-[13px] text-white/80 placeholder-white/20 focus:outline-none focus:border-violet-500/50 focus:bg-violet-500/5 transition-all" />
-            </div>
-            <div>
-              <label className="text-[11px] text-white/40 font-medium uppercase tracking-wider block mb-1.5">Email</label>
-              <input type="email" required value={email} onChange={e => setEmail(e.target.value)}
-                placeholder="you@example.com" autoComplete="email"
-                className="w-full bg-white/[0.04] border border-white/[0.09] rounded-xl px-4 py-2.5 text-[13px] text-white/80 placeholder-white/20 focus:outline-none focus:border-violet-500/50 focus:bg-violet-500/5 transition-all" />
-            </div>
-            <div>
-              <label className="text-[11px] text-white/40 font-medium uppercase tracking-wider block mb-1.5">
-                Password <span className="text-white/25 normal-case">(min 8 chars)</span>
-              </label>
-              <input type="password" required value={password} onChange={e => setPassword(e.target.value)}
-                placeholder="••••••••" autoComplete="new-password"
-                className="w-full bg-white/[0.04] border border-white/[0.09] rounded-xl px-4 py-2.5 text-[13px] text-white/80 placeholder-white/20 focus:outline-none focus:border-violet-500/50 focus:bg-violet-500/5 transition-all" />
-            </div>
-            <button type="submit" disabled={isLoading}
-              className="w-full mt-2 py-2.5 bg-violet-600 hover:bg-violet-500 text-white rounded-xl text-[13px] font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-violet-500/20">
-              {isLoading ? "Creating account..." : "Create account →"}
-            </button>
-          </form>
-
-          <p className="text-center text-[12px] text-white/30 mt-5">
-            Already have an account?{" "}
-            <Link href="/auth/login" className="text-violet-400 hover:text-violet-300 font-medium transition-colors">
-              Sign in →
-            </Link>
-          </p>
-        </div>
-      </motion.div>
-    </div>
-  );
+export default function AuthLayout({ children }: AuthLayoutProps) {
+  return <>{children}</>;
 }

@@ -82,7 +82,10 @@ async def init_db() -> None:
         logger.info("✅ pgvector extension enabled")
 
         # Import all models so Base knows about them before create_all
-        from app.database.models import User, Project, Session, Message, UserMemory, SessionMemory  # noqa: F401
+        from app.database.models import (
+            User, Project, Session, Message, UserMemory, SessionMemory,
+            VoiceSession, VoiceMessage
+        )  # noqa: F401
 
         # Create tables (won't overwrite existing ones)
         await conn.run_sync(Base.metadata.create_all)

@@ -25,8 +25,19 @@ export default function SignupPage() {
     }
     try {
       await signup({ name, email, password });
-    } catch {
-      setError("Could not create account. Email may already be in use.");
+    } catch (err: unknown) {
+      const axiosErr = err as any;
+      let message = "Could not create account.";
+      
+      if (axiosErr?.response?.data?.detail) {
+        message = axiosErr.response.data.detail;
+      } else if (axiosErr?.message) {
+        message = axiosErr.message;
+      } else if (axiosErr?.code === 'ERR_NETWORK') {
+        message = "Network error: Backend is not reachable. Make sure the backend is running at http://localhost:8000";
+      }
+      
+      setError(message);
     }
   }
 

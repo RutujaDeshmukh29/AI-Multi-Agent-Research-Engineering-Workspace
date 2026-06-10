@@ -26,7 +26,9 @@ from app.database.models import (  # noqa: F401
 config = context.config
 
 # Override the sqlalchemy.url from alembic.ini with our real DB URL
-config.set_main_option("sqlalchemy.url", settings.DATABASE_URL_SYNC)
+# We escape the URL to handle special characters like '%' in passwords
+safe_db_url = settings.DATABASE_URL_SYNC.replace('%', '%%')
+config.set_main_option("sqlalchemy.url", safe_db_url)
 
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
@@ -53,8 +55,12 @@ def do_run_migrations(connection: Connection) -> None:
 
 
 async def run_async_migrations() -> None:
+    # Use the async database URL for async engine
+    # Ensure the URL is properly escaped if it contains '%'
+    async_db_url = settings.DATABASE_URL.replace('%', '%%')
+
     connectable = async_engine_from_config(
-        config.get_section(config.config_ini_section, {}),
+        { "sqlalchemy.url": async_db_url }, # Pass URL directly, not from config section
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
     )

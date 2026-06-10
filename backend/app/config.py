@@ -22,11 +22,12 @@ class Settings(BaseSettings):
 
     # Comma-separated allowed origins for CORS
     # e.g. "http://localhost:3000,https://your-app.vercel.app"
-    ALLOWED_ORIGINS: str = "http://localhost:3000"
+    ALLOWED_ORIGINS: str = "http://localhost:3000,http://127.0.0.1:3000,http://localhost:3001,http://127.0.0.1:3001"
 
     @property
     def allowed_origins_list(self) -> List[str]:
-        return [o.strip() for o in self.ALLOWED_ORIGINS.split(",")]
+        return [o.strip() for o in self.ALLOWED_ORIGINS.split(",") if o.strip()]
+
 
     # ── Database (Supabase / Neon PostgreSQL) ──
     DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/ai_workspace"

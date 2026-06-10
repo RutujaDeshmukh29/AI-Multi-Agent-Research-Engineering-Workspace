@@ -37,8 +37,9 @@ async def create_user(db: AsyncSession, email: str, name: str, hashed_password: 
     """Create a new user. Called during signup."""
     user = User(email=email, name=name, hashed_password=hashed_password)
     db.add(user)
-    await db.flush()   # flush to get the generated ID without committing
+    await db.flush()   # flush to get the generated ID
     await db.refresh(user)
+    # Note: commit is handled by get_db dependency, not here
     return user
 
 
