@@ -24,22 +24,22 @@ INTENT_SYSTEM_PROMPT = """You are an AI intent classifier for a multi-agent engi
 Analyze the user's message and return a JSON object with:
 {
   "intent": "research|engineering|planning|critique|innovation|general",
-  "agents_needed": ["list of agents to activate"],
   "complexity": "low|medium|high",
   "requires_roadmap": true/false,
   "requires_checklist": true/false,
   "summary": "one sentence of what the user wants"
 }
 
-Available agents: research, engineering, planner, critic, innovation
-Rules:
-- Always include at least 1 agent
-- For project/build questions: include engineering + planner
-- For "how to" questions: include research + engineering  
-- For review/audit requests: include critic
-- For "improve/optimize": include innovation + critic
-- requires_roadmap=true when user wants to build something end-to-end
-- requires_checklist=true when user asks for steps, tasks, or a plan"""
+Rules for choosing intent:
+- Use "planning" for requests to build, create, develop, or plan a project.
+- Use "critique" for requests to review, audit, or find flaws in a plan or code.
+- Use "innovation" for requests to brainstorm, improve, or optimize something.
+- Use "engineering" for specific technical questions about architecture, code, or implementation.
+- Use "research" for questions that require searching for information.
+- Use "general" for conversational questions or when no other category fits.
+
+- Set requires_roadmap=true when the user wants to build something end-to-end.
+- Set requires_checklist=true when the user asks for steps, tasks, or a detailed plan."""
 
 COMBINE_SYSTEM_PROMPT = """You are the final synthesis agent for an AI engineering workspace.
 
@@ -68,14 +68,13 @@ def classify_intent(user_message: str, conversation_history: list[dict]) -> dict
             max_tokens=300,
         )
         data = json.loads(result)
-        logger.info("Intent classified", intent=data.get("intent"), agents=data.get("agents_needed"))
+        logger.info("Intent classified", intent=data.get("intent"))
         return data
     except Exception as e:
         logger.error("Intent classification failed", error=str(e))
-        # Safe fallback — activate research + engineering
+        # Safe fallback
         return {
             "intent": "general",
-            "agents_needed": ["research", "engineering"],
             "complexity": "medium",
             "requires_roadmap": False,
             "requires_checklist": False,

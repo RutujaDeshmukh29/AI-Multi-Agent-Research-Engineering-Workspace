@@ -10,6 +10,8 @@ from typing import TypedDict, AsyncGenerator
 from langgraph.graph import StateGraph, END
 import asyncio, json, structlog
 
+from .routing import get_agents_for_intent
+
 logger = structlog.get_logger()
 
 
@@ -47,10 +49,10 @@ def node_classify(state: AgentState) -> AgentState:
     emit(state, "qa", "thinking", "QA Controller analyzing your request...")
     data = classify_intent(state["user_message"], state["conversation_history"])
     state["intent"] = data.get("intent", "general")
-    state["agents_to_run"] = data.get("agents_needed", ["research", "engineering"])
+    state["complexity"] = data.get("complexity", "medium")
+    state["agents_to_run"] = get_agents_for_intent(state["intent"], state["complexity"])
     state["requires_roadmap"] = data.get("requires_roadmap", False)
     state["requires_checklist"] = data.get("requires_checklist", False)
-    state["complexity"] = data.get("complexity", "medium")
     state["current_agent_idx"] = 0
     emit(state, "qa", "done", f"Routing to: {', '.join(state['agents_to_run'])}")
     return state
