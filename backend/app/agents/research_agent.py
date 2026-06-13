@@ -3,7 +3,7 @@
 # Research Agent — Concept gatherer & explainer
 # ========================
 
-from app.services.groq_service import call_groq
+from app.services.groq_service import call_groq_async
 import structlog
 
 logger = structlog.get_logger()
@@ -32,7 +32,7 @@ Always structure your response as:
 Be precise, technical, and practical. Avoid fluff. Focus on what an engineer needs to know."""
 
 
-def run_research_agent(
+async def run_research_agent(
     user_message: str,
     conversation_history: list[dict],
     user_memory_context: str = "",
@@ -48,7 +48,7 @@ def run_research_agent(
     ]
 
     try:
-        result = call_groq(
+        result = await call_groq_async(
             messages=messages,
             system_prompt=RESEARCH_SYSTEM_PROMPT,
             max_tokens=800,

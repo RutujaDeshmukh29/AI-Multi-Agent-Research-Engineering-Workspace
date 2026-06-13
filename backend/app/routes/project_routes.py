@@ -71,6 +71,40 @@ class SessionResponse(BaseModel):
     class Config:
         from_attributes = True
 
+class RoadmapTaskResponse(BaseModel):
+    id: str
+    roadmap_id: str
+    phase_id: str
+    task_id: str
+    title: str
+    description: Optional[str]
+    estimated_hours: Optional[int]
+    priority: Optional[str]
+    tags: Optional[list[str]]
+    completed: bool
+    completed_at: Optional[str]
+
+    class Config:
+        from_attributes = True
+
+class RoadmapResponse(BaseModel):
+    id: str
+    project_id: str
+    project_title: str
+    total_phases: int
+    estimated_weeks: int
+    progress_percent: int
+    phases_json: dict
+    tasks: list[RoadmapTaskResponse]
+    created_at: str
+    updated_at: str
+
+    class Config:
+        from_attributes = True
+        
+class TaskUpdate(BaseModel):
+    completed: bool
+
 
 # ─────────────────────────────────────────
 # PROJECT ROUTES
@@ -281,3 +315,77 @@ async def get_messages(
         }
         for m in messages
     ]
+
+
+# ─────────────────────────────────────────
+# ROADMAP ROUTES (nested under projects)
+# ─────────────────────────────────────────
+
+@router.get("/{project_id}/roadmap", response_model=Optional[RoadmapResponse])
+async def get_roadmap(
+    project_id: str,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Get the current roadmap for a project."""
+    pid = uuid.UUID(project_id)
+    roadmap = await crud.get_roadmap_by_project_id(db, pid, user.id)
+    if not roadmap:
+        return None
+    return roadmap
+
+@router.post("/{project_id}/roadmap/generate", response_model=RoadmapResponse)
+async def generate_roadmap(
+    project_id: str,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """
+    Generates a new roadmap for a project using the planner agent.
+    This replaces any existing roadmap.
+    """
+    try:
+        pid = uuid.UUID(project_id)
+        project = await crud.get_project_by_id(db, pid, user.id)
+        if not project:
+            raise HTTPException(status_code=404, detail="Project not found")
+
+        from app.agents.planner_agent import generate_roadmap_json
+
+        # We need a conversation history to generate a roadmap.
+        # For now, we'll create a simple one based on the project name and description.
+        fake_history = [{"role": "user", "content": f"Create a roadmap for the project: {project.name}. Description: {project.description}"}]
+        
+        roadmap_json = await generate_roadmap_json(project.name, fake_history)
+
+        if not roadmap_json:
+            raise HTTPException(status_code=500, detail="Failed to generate roadmap from AI agent after self-correction.")
+
+        new_roadmap = await crud.create_or_update_roadmap(db, pid, user.id, roadmap_json)
+
+        if not new_roadmap:
+            raise HTTPException(status_code=500, detail="Failed to save roadmap to database.")
+
+        return new_roadmap
+    except Exception as e:
+        logger.error("Roadmap generation failed at the route level", error=str(e), exc_info=True)
+        raise HTTPException(status_code=500, detail=f"An unexpected error occurred while generating the roadmap.")
+
+
+@router.put("/{project_id}/roadmap/tasks/{task_id}", response_model=RoadmapResponse)
+async def update_roadmap_task(
+    project_id: str,
+    task_id: str,
+    body: TaskUpdate,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Mark a roadmap task as complete or incomplete."""
+    pid = uuid.UUID(project_id)
+    updated_roadmap = await crud.update_task_completion(
+        db, project_id=pid, user_id=user.id, task_id=task_id, completed=body.completed
+    )
+    if not updated_roadmap:
+        raise HTTPException(status_code=404, detail="Roadmap or task not found.")
+    
+    return updated_roadmap

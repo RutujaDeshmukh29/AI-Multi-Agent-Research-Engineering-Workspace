@@ -343,7 +343,8 @@ class ProjectRoadmap(Base):
     created_at     = Column(DateTime(timezone=True), server_default=func.now())
     updated_at     = Column(DateTime(timezone=True), onupdate=func.now(), server_default=func.now())
 
-    tasks = relationship("RoadmapTask", back_populates="roadmap", cascade="all, delete-orphan")
+    tasks = relationship("RoadmapTask", back_populates="roadmap", cascade="all, delete-orphan",
+                         order_by="RoadmapTask.phase_index, RoadmapTask.task_index")
 
 
 # ─────────────────────────────────────────

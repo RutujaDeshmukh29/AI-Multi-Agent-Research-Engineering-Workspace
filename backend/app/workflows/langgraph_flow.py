@@ -1,30 +1,41 @@
 # ========================
-# app/workflows/langgraph_flow.py  — FIXED
+# app/workflows/langgraph_flow.py — REFACTORED
 # LangGraph Multi-Agent Orchestration
-# Bug fix: LangGraph conditional edges return ONE string (not a list)
-# Solution: classify node sets agents_to_run, then a router dispatches
-# sequentially. For true parallel we use asyncio.gather in the run function.
+#
+# Key Changes:
+# 1. Parallel Agent Execution: Agents now run concurrently using asyncio.gather
+#    to significantly reduce latency.
+# 2. Advanced Routing: A new conditional route handles "simple_qa" intents
+#    for fast, direct answers, bypassing specialized agents.
+# 3. Async Workflow: The entire graph and its nodes are now asynchronous,
+#    using LangGraph's async capabilities (`ainvoke`).
+# 4. DB Integration: Roadmap saving is now a part of the workflow itself.
 # ========================
 
-from typing import TypedDict, AsyncGenerator
+from typing import TypedDict, AsyncGenerator, Coroutine, Any
 from langgraph.graph import StateGraph, END
-import asyncio, json, structlog
+import asyncio
+import json
+import structlog
+import uuid
 
 from .routing import get_agents_for_intent
+from app.services.groq_service import call_groq_async
+from app.database.db import get_db_context
+from app.database import crud
 
 logger = structlog.get_logger()
 
-
+# ── State Definition ──────────────────────────────────────────────────
 class AgentState(TypedDict):
     user_message: str
     conversation_history: list
     user_memory_context: str
     user_id: str
     session_id: str
-    intent: str
-    agents_to_run: list
-    requires_roadmap: bool
-    requires_checklist: bool
+    project_id: str # Added project_id
+    intents: list[str]
+    agents_to_run: list[str]
     complexity: str
     research_output: str
     engineering_output: str
@@ -34,99 +45,119 @@ class AgentState(TypedDict):
     roadmap_json: dict
     final_response: str
     agent_events: list
-    current_agent_idx: int   # tracks sequential dispatch
-
 
 def emit(state: AgentState, agent: str, status: str, msg: str):
     if "agent_events" not in state or state["agent_events"] is None:
         state["agent_events"] = []
     state["agent_events"].append({"type": "agent_update", "agent": agent, "status": status, "message": msg})
 
-
-# ── Node: Classify ───────────────────────
-def node_classify(state: AgentState) -> AgentState:
+# ── Node: Classify Intent ─────────────────────────────────────────────
+async def node_classify(state: AgentState) -> AgentState:
     from app.agents.qa_agent import classify_intent
     emit(state, "qa", "thinking", "QA Controller analyzing your request...")
-    data = classify_intent(state["user_message"], state["conversation_history"])
-    state["intent"] = data.get("intent", "general")
-    state["complexity"] = data.get("complexity", "medium")
-    state["agents_to_run"] = get_agents_for_intent(state["intent"], state["complexity"])
-    state["requires_roadmap"] = data.get("requires_roadmap", False)
-    state["requires_checklist"] = data.get("requires_checklist", False)
-    state["current_agent_idx"] = 0
-    emit(state, "qa", "done", f"Routing to: {', '.join(state['agents_to_run'])}")
+    
+    classification = await classify_intent(state["user_message"], state["conversation_history"])
+    
+    state["intents"] = classification.get("intents", ["simple_qa"])
+    state["complexity"] = classification.get("complexity", "low")
+    state["agents_to_run"] = get_agents_for_intent(state["intents"])
+
+    if state["agents_to_run"]:
+        emit(state, "qa", "done", f"Routing to: {', '.join(state['agents_to_run'])}")
+    else:
+        emit(state, "qa", "done", "Routing for a direct answer.")
+        
     return state
 
-
-# ── Node: Dispatch (runs ONE agent per call, loops back) ──
-def node_dispatch(state: AgentState) -> AgentState:
-    idx = state.get("current_agent_idx", 0)
-    agents = state.get("agents_to_run", [])
-
-    if idx >= len(agents):
-        return state  # all done
-
-    agent_name = agents[idx]
-
-    if agent_name == "research":
-        from app.agents.research_agent import run_research_agent
-        emit(state, "research", "thinking", "Research Agent analyzing concepts...")
-        out = run_research_agent(state["user_message"], state["conversation_history"], state["user_memory_context"])
-        state["research_output"] = out
-        emit(state, "research", "done", "Research complete ✓")
-
-    elif agent_name == "engineering":
-        from app.agents.engineering_agent import run_engineering_agent
-        emit(state, "engineering", "thinking", "Engineering Agent generating architecture...")
-        out = run_engineering_agent(state["user_message"], state["conversation_history"], state["user_memory_context"])
-        state["engineering_output"] = out
-        emit(state, "engineering", "done", "Architecture ready ✓")
-
-    elif agent_name == "planner":
-        from app.agents.planner_agent import run_planner_agent, generate_roadmap_json
-        emit(state, "planner", "thinking", "Planner Agent building roadmap...")
-        out = run_planner_agent(state["user_message"], state["conversation_history"], state["user_memory_context"])
-        state["planner_output"] = out
-        if state.get("requires_roadmap") or state.get("requires_checklist"):
-            emit(state, "planner", "thinking", "Generating interactive checklist...")
-            rmap = generate_roadmap_json(state["user_message"], state["conversation_history"])
-            state["roadmap_json"] = rmap or {}
-        emit(state, "planner", "done", "Roadmap + checklist created ✓")
-
-    elif agent_name == "critic":
-        from app.agents.critic_agent import run_critic_agent
-        emit(state, "critic", "thinking", "Critic Agent scanning for issues...")
-        out = run_critic_agent(state["user_message"], state["conversation_history"], state.get("engineering_output", ""))
-        state["critic_output"] = out
-        emit(state, "critic", "done", "Critical review done ✓")
-
-    elif agent_name == "innovation":
-        from app.agents.innovation_agent import run_innovation_agent
-        emit(state, "innovation", "thinking", "Innovation Agent generating ideas...")
-        out = run_innovation_agent(state["user_message"], state["conversation_history"], state.get("engineering_output", ""))
-        state["innovation_output"] = out
-        emit(state, "innovation", "done", "Innovations ready ✓")
-
-    state["current_agent_idx"] = idx + 1
+# ── Node: Simple QA (Direct Answer) ──────────────────────────────────
+async def node_simple_qa(state: AgentState) -> AgentState:
+    emit(state, "qa", "thinking", "Generating a direct answer...")
+    
+    SIMPLE_QA_PROMPT = "You are a helpful AI assistant. Provide a clear and concise answer to the user's question."
+    
+    response = await call_groq_async(
+        messages=[{"role": "user", "content": state["user_message"]}],
+        system_prompt=SIMPLE_QA_PROMPT,
+        max_tokens=500,
+        temperature=0.3
+    )
+    
+    state["final_response"] = response
+    emit(state, "qa", "done", "Direct answer ready ✓")
     return state
 
+# ── Node: Parallel Agent Dispatch ───────────────────────────────────
+async def node_parallel_dispatch(state: AgentState) -> AgentState:
+    from app.agents import (
+        research_agent, engineering_agent, planner_agent,
+        critic_agent, innovation_agent
+    )
 
-# ── Routing: more agents? ─────────────────
-def should_continue(state: AgentState) -> str:
-    idx = state.get("current_agent_idx", 0)
-    agents = state.get("agents_to_run", [])
-    return "dispatch" if idx < len(agents) else "combine"
+    agent_map = {
+        "research": research_agent.run_research_agent,
+        "engineering": engineering_agent.run_engineering_agent,
+        "planner": planner_agent.run_planner_agent,
+        "critic": critic_agent.run_critic_agent,
+        "innovation": innovation_agent.run_innovation_agent,
+    }
 
+    tasks: list[Coroutine[Any, Any, Any]] = []
+    agent_names_to_run = state["agents_to_run"]
+    
+    for agent_name in agent_names_to_run:
+        if agent_name in agent_map:
+            emit(state, agent_name, "thinking", f"{agent_name.title()} Agent starting...")
+            task = agent_map[agent_name](
+                state["user_message"],
+                state["conversation_history"],
+                state["user_memory_context"]
+            )
+            tasks.append(task)
+            
+    if tasks:
+        results = await asyncio.gather(*tasks)
+        for agent_name, result in zip(agent_names_to_run, results):
+            state[f"{agent_name}_output"] = result
+            emit(state, agent_name, "done", f"{agent_name.title()} Agent complete ✓")
 
-# ── Node: Combine ─────────────────────────
-def node_combine(state: AgentState) -> AgentState:
+    if "planner" in agent_names_to_run:
+        emit(state, "planner", "thinking", "Generating interactive checklist...")
+        rmap = await planner_agent.generate_roadmap_json(
+            state["user_message"], state["conversation_history"]
+        )
+        if rmap:
+            state["roadmap_json"] = rmap
+            emit(state, "planner", "done", "Roadmap + checklist created ✓")
+            
+            project_id = uuid.UUID(state.get("project_id"))
+            user_id = uuid.UUID(state.get("user_id"))
+            session_id = uuid.UUID(state.get("session_id"))
+            if project_id and user_id:
+                try:
+                    async with get_db_context() as db:
+                        await crud.create_or_update_roadmap(db, project_id, user_id, rmap, session_id)
+                    emit(state, "db", "done", "Roadmap saved to database.")
+                except Exception as e:
+                    logger.error("Failed to save roadmap in workflow", error=str(e))
+                    emit(state, "db", "error", "Failed to save roadmap.")
+        else:
+            state["roadmap_json"] = {}
+            emit(state, "planner", "error", "Failed to generate roadmap JSON.")
+
+    return state
+
+# ── Node: Combine Outputs ────────────────────────────────────────────
+async def node_combine(state: AgentState) -> AgentState:
     from app.agents.qa_agent import combine_agent_outputs
     emit(state, "qa", "thinking", "QA Controller synthesizing all agent outputs...")
-    outputs = {}
-    for k in ["research_output", "engineering_output", "planner_output", "critic_output", "innovation_output"]:
-        if state.get(k):
-            outputs[k.replace("_output", "")] = state[k]
-    final = combine_agent_outputs(
+    
+    outputs = {
+        k.replace("_output", ""): v
+        for k, v in state.items()
+        if k.endswith("_output") and v
+    }
+    
+    final = await combine_agent_outputs(
         state["user_message"], outputs,
         state["conversation_history"], state["user_memory_context"]
     )
@@ -134,21 +165,36 @@ def node_combine(state: AgentState) -> AgentState:
     emit(state, "qa", "done", "Response ready ✓")
     return state
 
+# ── Routing Logic ───────────────────────────────────────────────────
+def should_run_agents(state: AgentState) -> str:
+    if not state.get("agents_to_run"):
+        return "simple_qa"
+    return "parallel_dispatch"
 
-# ── Build Graph ───────────────────────────
+# ── Graph Definition ────────────────────────────────────────────────
 def build_agent_graph():
     g = StateGraph(AgentState)
+    
     g.add_node("classify", node_classify)
-    g.add_node("dispatch", node_dispatch)
-    g.add_node("combine",  node_combine)
+    g.add_node("simple_qa", node_simple_qa)
+    g.add_node("parallel_dispatch", node_parallel_dispatch)
+    g.add_node("combine", node_combine)
 
     g.set_entry_point("classify")
-    g.add_edge("classify", "dispatch")
-    g.add_conditional_edges("dispatch", should_continue, {"dispatch": "dispatch", "combine": "combine"})
+    
+    g.add_conditional_edges(
+        "classify",
+        should_run_agents,
+        {"simple_qa": "simple_qa", "parallel_dispatch": "parallel_dispatch"}
+    )
+    
+    g.add_edge("simple_qa", END)
+    g.add_edge("parallel_dispatch", "combine")
     g.add_edge("combine", END)
+    
     return g.compile()
 
-
+# ── Pipeline Execution ──────────────────────────────────────────────
 _graph = None
 def get_graph():
     global _graph
@@ -156,39 +202,52 @@ def get_graph():
         _graph = build_agent_graph()
     return _graph
 
-
-# ── Execute Pipeline ─────────────────────
 async def run_agent_pipeline(
     user_message: str,
     conversation_history: list,
     user_memory_context: str = "",
     user_id: str = "",
     session_id: str = "",
+    project_id: str = "", # Added project_id
 ) -> AsyncGenerator[str, None]:
-    initial: AgentState = {
+    initial_state: AgentState = {
         "user_message": user_message,
         "conversation_history": conversation_history,
         "user_memory_context": user_memory_context,
         "user_id": user_id,
         "session_id": session_id,
-        "intent": "", "agents_to_run": [],
-        "requires_roadmap": False, "requires_checklist": False, "complexity": "medium",
-        "research_output": "", "engineering_output": "", "planner_output": "",
-        "critic_output": "", "innovation_output": "",
-        "roadmap_json": {}, "final_response": "", "agent_events": [], "current_agent_idx": 0,
+        "project_id": project_id, # Added project_id
+        "intents": [],
+        "agents_to_run": [],
+        "complexity": "low",
+        "research_output": "",
+        "engineering_output": "",
+        "planner_output": "",
+        "critic_output": "",
+        "innovation_output": "",
+        "roadmap_json": {},
+        "final_response": "",
+        "agent_events": [],
     }
+    
     try:
         graph = get_graph()
-        loop = asyncio.get_event_loop()
-        final = await loop.run_in_executor(None, lambda: graph.invoke(initial))
+        
+        final_state = await graph.ainvoke(initial_state)
 
-        for ev in (final.get("agent_events") or []):
+        for ev in (final_state.get("agent_events") or []):
             yield f"data: {json.dumps(ev)}\n\n"
             await asyncio.sleep(0.04)
 
-        outputs = {k.replace("_output",""): v for k, v in final.items() if k.endswith("_output") and v}
-        yield f"data: {json.dumps({'type':'final','content':final['final_response'],'agent_outputs':outputs,'roadmap':final.get('roadmap_json')})}\n\n"
+        outputs = {k.replace("_output",""): v for k, v in final_state.items() if k.endswith("_output") and v}
+        final_data = {
+            'type': 'final',
+            'content': final_state.get('final_response', 'An error occurred.'),
+            'agent_outputs': outputs,
+            'roadmap': final_state.get('roadmap_json')
+        }
+        yield f"data: {json.dumps(final_data)}\n\n"
 
     except Exception as e:
-        logger.error("Pipeline failed", error=str(e))
+        logger.error("Agent pipeline failed", error=str(e), exc_info=True)
         yield f"data: {json.dumps({'type':'error','message':str(e)})}\n\n"

@@ -13,33 +13,57 @@
 # It doesn't play any instrument — it coordinates all of them.
 # ========================
 
-from app.services.groq_service import call_groq, call_groq_json
+from app.services.groq_service import call_groq_async, call_groq_json, call_groq_json_async
 import json
 import structlog
 
 logger = structlog.get_logger()
 
-INTENT_SYSTEM_PROMPT = """You are an AI intent classifier for a multi-agent engineering workspace.
+INTENT_SYSTEM_PROMPT = """You are an expert AI intent classifier for a multi-agent AI engineering workspace. Your task is to analyze the user's request and provide a detailed JSON object to orchestrate a team of specialized AI agents.
 
-Analyze the user's message and return a JSON object with:
+Analyze the user's message and the conversation history, then return a JSON object with the following schema:
 {
-  "intent": "research|engineering|planning|critique|innovation|general",
-  "complexity": "low|medium|high",
-  "requires_roadmap": true/false,
-  "requires_checklist": true/false,
-  "summary": "one sentence of what the user wants"
+  "intents": ["research" | "engineering" | "planning" | "critique" | "innovation" | "simple_qa"],
+  "complexity": "low" | "medium" | "high",
+  "summary": "A one-sentence summary of the user's core request."
 }
 
-Rules for choosing intent:
-- Use "planning" for requests to build, create, develop, or plan a project.
-- Use "critique" for requests to review, audit, or find flaws in a plan or code.
-- Use "innovation" for requests to brainstorm, improve, or optimize something.
-- Use "engineering" for specific technical questions about architecture, code, or implementation.
-- Use "research" for questions that require searching for information.
-- Use "general" for conversational questions or when no other category fits.
+**Agent Specializations & Routing Rules:**
 
-- Set requires_roadmap=true when the user wants to build something end-to-end.
-- Set requires_checklist=true when the user asks for steps, tasks, or a detailed plan."""
+*   **`research`**:
+    *   **Use for:** Requests that require gathering, summarizing, or analyzing information from external sources. Look for keywords like "research," "find," "what are the latest trends," "compare," "summarize."
+    *   **Examples:** "Research the latest trends in AI agents.", "Compare React and Vue for a new project.", "Find tutorials on FastAPI authentication."
+
+*   **`engineering`**:
+    *   **Use for:** Requests involving specific code, architecture design, implementation steps, or technical guidance. Look for keywords like "write code," "implement," "build," "refactor," "architecture," "how to," "debug," "fix."
+    *   **Examples:** "Write a Python script to process a CSV.", "My roadmap generation is broken, can you fix it?", "How do I deploy a Next.js app to Vercel?"
+
+*   **`planning`**:
+    *   **Use for:** Requests that involve creating a project plan, roadmap, or a sequence of steps to build something. Look for keywords like "plan," "roadmap," "develop a plan for," "outline the steps to create."
+    *   **Examples:** "Plan a full-stack AI project.", "Create a roadmap for building an e-commerce site.", "Outline the development phases for a new mobile app."
+
+*   **`critique`**:
+    *   **Use for:** Requests to review, audit, analyze, or find flaws in code, a plan, or an architecture. Look for keywords like "critique," "review," "find issues," "what are the cons," "improve this," "is this a good approach."
+    *   **Examples:** "Critique my project plan.", "Review this code for security vulnerabilities.", "My agent routing seems inefficient, can you analyze and improve it?"
+
+*   **`innovation`**:
+    *   **Use for:** Requests that involve brainstorming new ideas, suggesting novel features, or finding creative solutions. This is for open-ended, ideation-focused queries.
+    *   **Examples:** "Brainstorm innovative features for a fitness app.", "Suggest a novel application of LLMs in education.", "What are some creative ways to improve my agent's routing logic?"
+
+*   **`simple_qa`**:
+    *   **USE AS A LAST RESORT.** Only use for simple, factual questions that can be answered directly and do not require any of the specialized analysis from the agents above.
+    *   **Examples:** "What is a vector database?", "What's the difference between AI and ML?", "Who created Python?".
+    *   **Decision:** If a query is a `simple_qa`, the `intents` array should contain ONLY `"simple_qa"`.
+
+**Multi-Intent & Complexity Rules:**
+
+*   **CRITICAL RULE: A user request can and often will have multiple intents.** Your primary goal is to identify ALL relevant intents.
+*   **Example 1:** "Plan a new AI app and write the starter code" has `["planning", "engineering"]` intents.
+*   **Example 2:** "My agent routing isn't working well, it just defaults to QA. I want it to use the planner for roadmaps and the critic for analysis. Also, my roadmap generation is broken." This is a high-complexity request that should have `["critique", "planning", "engineering"]` in the `intents` array.
+*   The `"complexity"` field should reflect the scope of the request. "What is AI?" is `low` complexity. "Build a social media app from scratch" is `high` complexity.
+
+Your output must be ONLY the JSON object, with no other text or markdown.
+"""
 
 COMBINE_SYSTEM_PROMPT = """You are the final synthesis agent for an AI engineering workspace.
 
@@ -54,7 +78,7 @@ You receive outputs from multiple specialized AI agents. Your job is to:
 Be comprehensive but not verbose. Quality over quantity."""
 
 
-def classify_intent(user_message: str, conversation_history: list[dict]) -> dict:
+async def classify_intent(user_message: str, conversation_history: list[dict]) -> dict:
     """
     Step 1: Classify what the user wants and which agents to activate.
     Returns structured JSON with routing decisions.
@@ -62,27 +86,29 @@ def classify_intent(user_message: str, conversation_history: list[dict]) -> dict
     messages = conversation_history[-4:] + [{"role": "user", "content": user_message}]
 
     try:
-        result = call_groq_json(
+        result = await call_groq_json_async(
             messages=messages,
             system_prompt=INTENT_SYSTEM_PROMPT,
-            max_tokens=300,
+            max_tokens=500,
         )
         data = json.loads(result)
-        logger.info("Intent classified", intent=data.get("intent"))
+        # Ensure 'intents' is always a list
+        if "intents" not in data or not isinstance(data["intents"], list):
+            data["intents"] = ["simple_qa"]
+            
+        logger.info("Intent classified", intents=data.get("intents"))
         return data
     except Exception as e:
         logger.error("Intent classification failed", error=str(e))
         # Safe fallback
         return {
-            "intent": "general",
-            "complexity": "medium",
-            "requires_roadmap": False,
-            "requires_checklist": False,
+            "intents": ["simple_qa"],
+            "complexity": "low",
             "summary": user_message[:100],
         }
 
 
-def combine_agent_outputs(
+async def combine_agent_outputs(
     user_message: str,
     agent_outputs: dict[str, str],
     conversation_history: list[dict],
@@ -116,7 +142,7 @@ Create a unified, expert response that incorporates the best insights from all a
     ]
 
     try:
-        return call_groq(
+        return await call_groq_async(
             messages=synthesis_messages,
             system_prompt=COMBINE_SYSTEM_PROMPT,
             max_tokens=2000,
@@ -125,3 +151,4 @@ Create a unified, expert response that incorporates the best insights from all a
         logger.error("Combination failed", error=str(e))
         # Fallback: return all agent outputs concatenated
         return "\n\n".join(f"**{k.title()} Agent:**\n{v}" for k, v in agent_outputs.items())
+

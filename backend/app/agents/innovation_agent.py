@@ -3,7 +3,7 @@
 # Innovation Agent — Creative Ideas & Future Thinking
 # ========================
 
-from app.services.groq_service import call_groq
+from app.services.groq_service import call_groq_async
 import structlog
 
 logger = structlog.get_logger()
@@ -39,7 +39,7 @@ Structure your response as:
 Think like a product engineer who's also a startup founder. Build for the user, not just the spec."""
 
 
-def run_innovation_agent(
+async def run_innovation_agent(
     user_message: str,
     conversation_history: list[dict],
     engineering_output: str = "",
@@ -55,7 +55,7 @@ def run_innovation_agent(
     ]
 
     try:
-        result = call_groq(
+        result = await call_groq_async(
             messages=messages,
             system_prompt=INNOVATION_SYSTEM_PROMPT,
             max_tokens=700,

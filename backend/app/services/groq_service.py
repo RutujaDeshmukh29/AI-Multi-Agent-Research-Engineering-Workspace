@@ -17,10 +17,10 @@ import structlog
 logger = structlog.get_logger()
 
 # Sync client (for simple one-shot calls)
-groq_client = Groq(api_key=settings.GROQ_API_KEY)
+groq_client = Groq(api_key=settings.GROQ_API_KEY, timeout=60.0)
 
 # Async client (for FastAPI routes — never block the event loop)
-async_groq_client = AsyncGroq(api_key=settings.GROQ_API_KEY)
+async_groq_client = AsyncGroq(api_key=settings.GROQ_API_KEY, timeout=60.0)
 
 
 def call_groq(
@@ -112,3 +112,15 @@ def call_groq_json(
     """
     full_system = system_prompt + "\n\nIMPORTANT: Respond ONLY with valid JSON. No markdown, no explanation."
     return call_groq(messages, system_prompt=full_system, max_tokens=max_tokens, temperature=0.2)
+
+
+async def call_groq_json_async(
+    messages: list[dict],
+    system_prompt: str,
+    max_tokens: int = 2048,
+) -> str:
+    """
+    Async force JSON output from Groq.
+    """
+    full_system = system_prompt + "\n\nIMPORTANT: Respond ONLY with valid JSON. No markdown, no explanation."
+    return await call_groq_async(messages, system_prompt=full_system, max_tokens=max_tokens, temperature=0.2)

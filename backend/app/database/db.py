@@ -66,6 +66,20 @@ async def get_db() -> AsyncSession:  # type: ignore[return]
             await session.close()
 
 
+from contextlib import asynccontextmanager
+@asynccontextmanager
+async def get_db_context():
+    async with AsyncSessionLocal() as session:
+        try:
+            yield session
+            await session.commit()
+        except Exception:
+            await session.rollback()
+            raise
+        finally:
+            await session.close()
+
+
 # ─────────────────────────────────────────
 # INIT DB  — called on startup
 # Creates all tables + enables pgvector

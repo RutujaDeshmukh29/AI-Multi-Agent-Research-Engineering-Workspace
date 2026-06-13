@@ -4,34 +4,43 @@
 # Keeps routing logic separate from the graph definition
 # ========================
 
+# 1-to-1 mapping of intents to agents.
+# The new classify_intent function is responsible for finding all relevant intents.
 AGENT_ROUTING_MAP = {
     "research":    ["research"],
-    "engineering": ["research", "engineering"],
-    "planning":    ["research", "engineering", "planner"],
-    "critique":    ["engineering", "critic"],
-    "innovation":  ["engineering", "innovation"],
-    "general":     ["research", "engineering"],
-}
-
-COMPLEXITY_AGENT_MAP = {
-    "low":    2,   # max agents for low complexity
-    "medium": 3,
-    "high":   5,   # all agents for complex questions
+    "engineering": ["engineering"],
+    "planning":    ["planner"],
+    "critique":    ["critic"],
+    "innovation":  ["innovation"],
 }
 
 
-def get_agents_for_intent(intent: str, complexity: str = "medium") -> list[str]:
+def get_agents_for_intent(intents: list[str]) -> list[str]:
     """
-    Returns the list of agents to activate based on intent + complexity.
-    Higher complexity = more agents.
+    Returns the unique list of agents to activate based on a list of intents.
+    Handles the 'simple_qa' case where no agents are needed.
     """
-    base = AGENT_ROUTING_MAP.get(intent, ["research", "engineering"])
-    max_agents = COMPLEXITY_AGENT_MAP.get(complexity, 3)
-    return base[:max_agents]
+    # If it's a simple question, no specialized agents are needed.
+    if "simple_qa" in intents:
+        return []
 
+    # Use a set to automatically handle duplicates if an intent is listed multiple times
+    agents_to_run = set()
+    for intent in intents:
+        agents = AGENT_ROUTING_MAP.get(intent)
+        if agents:
+            agents_to_run.update(agents)
 
-def should_generate_roadmap(message: str) -> bool:
-    """Quick heuristic check — LLM classification is more accurate but this is a fast fallback."""
-    keywords = ["build", "create", "develop", "plan", "roadmap", "project", "implement", "system", "app", "platform"]
-    msg_lower = message.lower()
-    return any(k in msg_lower for k in keywords)
+    # Define a preferred order for agent execution. This ensures that 'research'
+    # runs before 'engineering', etc., which can be useful for downstream dependencies.
+    preferred_order = ["research", "planning", "engineering", "critique", "innovation"]
+    
+    # Sort the unique agents based on the preferred order
+    # Agents not in the preferred_order list will be placed at the end.
+    sorted_agents = sorted(
+        list(agents_to_run), 
+        key=lambda agent: preferred_order.index(agent) if agent in preferred_order else float('inf')
+    )
+    
+    return sorted_agents
+

@@ -14,7 +14,7 @@ from sqlalchemy.orm import selectinload
 from typing import Optional
 import uuid
 
-from app.database.models import User, Project, Session, Message, UserMemory, SessionMemory
+from app.database.models import User, Project, Session, Message, UserMemory, SessionMemory, ProjectRoadmap, RoadmapTask
 
 
 # ─────────────────────────────────────────
@@ -181,3 +181,115 @@ async def create_message(
     await db.flush()
     await db.refresh(message)
     return message
+
+
+# ─────────────────────────────────────────
+# ROADMAP CRUD
+# ─────────────────────────────────────────
+
+async def create_or_update_roadmap(db: AsyncSession, project_id: uuid.UUID, user_id: uuid.UUID, roadmap_data: dict, session_id: uuid.UUID = None) -> Optional[ProjectRoadmap]:
+    """
+    Create a new roadmap or update the existing one for a project.
+    This is an "upsert" operation that also syncs the child tasks.
+    """
+    # First, safely delete the old roadmap using the ORM to ensure cascades work.
+    # get_roadmap_by_project_id includes the user_id check, making this secure.
+    existing_roadmap = await get_roadmap_by_project_id(db, project_id, user_id)
+    if existing_roadmap:
+        await db.delete(existing_roadmap)
+        await db.flush()
+
+    # Create the new roadmap
+    new_roadmap = ProjectRoadmap(
+        project_id=project_id,
+        user_id=user_id,
+        session_id=session_id,
+        project_title=roadmap_data.get("project_title", "Untitled Roadmap"),
+        total_phases=roadmap_data.get("total_phases", 0),
+        estimated_weeks=roadmap_data.get("estimated_weeks", 0),
+        phases_json=roadmap_data, # Store the full original JSON
+        progress_percent=0 # Starts at 0
+    )
+    db.add(new_roadmap)
+    await db.flush()
+
+    # Create the individual tasks from the JSON
+    tasks = []
+    total_tasks = 0
+    completed_tasks = 0
+    for i, phase in enumerate(roadmap_data.get("phases", [])):
+        for j, task_data in enumerate(phase.get("tasks", [])):
+            total_tasks += 1
+            if task_data.get("completed", False):
+                completed_tasks += 1
+            
+            task = RoadmapTask(
+                roadmap_id=new_roadmap.id,
+                phase_id=phase.get("id"),
+                task_id=task_data.get("id"),
+                title=task_data.get("title"),
+                description=task_data.get("description"),
+                estimated_hours=task_data.get("estimated_hours"),
+                priority=task_data.get("priority"),
+                tags=task_data.get("tags"),
+                phase_index=i,
+                task_index=j,
+                completed=task_data.get("completed", False)
+            )
+            tasks.append(task)
+    
+    if tasks:
+        db.add_all(tasks)
+
+    # Update progress percent
+    if total_tasks > 0:
+        new_roadmap.progress_percent = int((completed_tasks / total_tasks) * 100)
+    
+    await db.flush()
+    await db.refresh(new_roadmap)
+    
+    # Eagerly load tasks for the returned object
+    return await get_roadmap_by_project_id(db, project_id, user_id)
+
+
+async def get_roadmap_by_project_id(db: AsyncSession, project_id: uuid.UUID, user_id: uuid.UUID) -> Optional[ProjectRoadmap]:
+    """Get the roadmap for a project, including all its tasks, ordered correctly."""
+    result = await db.execute(
+        select(ProjectRoadmap)
+        .options(selectinload(ProjectRoadmap.tasks))
+        .where(ProjectRoadmap.project_id == project_id, ProjectRoadmap.user_id == user_id)
+    )
+    return result.scalar_one_or_none()
+
+
+async def update_task_completion(db: AsyncSession, project_id: uuid.UUID, user_id: uuid.UUID, task_id: str, completed: bool) -> Optional[ProjectRoadmap]:
+    """Update a single task's completion status and recalculate roadmap progress."""
+    roadmap = await get_roadmap_by_project_id(db, project_id, user_id)
+    if not roadmap:
+        return None
+
+    # Update the specific task
+    task_to_update = None
+    for task in roadmap.tasks:
+        if task.task_id == task_id:
+            task.completed = completed
+            task_to_update = task
+            break
+            
+    if not task_to_update:
+        return None # Task not found
+
+    # Recalculate progress
+    total_tasks = len(roadmap.tasks)
+    completed_tasks = sum(1 for t in roadmap.tasks if t.completed)
+    
+    if total_tasks > 0:
+        roadmap.progress_percent = int((completed_tasks / total_tasks) * 100)
+    else:
+        roadmap.progress_percent = 0
+
+    await db.flush()
+    await db.refresh(roadmap)
+    
+    # Re-fetch to get the updated state correctly, especially after the flush
+    return await get_roadmap_by_project_id(db, project_id, user_id)

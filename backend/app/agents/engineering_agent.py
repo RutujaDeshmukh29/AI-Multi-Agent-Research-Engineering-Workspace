@@ -3,7 +3,7 @@
 # Engineering Agent — Architecture & Implementation
 # ========================
 
-from app.services.groq_service import call_groq
+from app.services.groq_service import call_groq_async
 import structlog
 
 logger = structlog.get_logger()
@@ -39,7 +39,7 @@ Be opinionated. Recommend the BEST approach, not all possible approaches.
 Assume the developer is competent but wants clear direction."""
 
 
-def run_engineering_agent(
+async def run_engineering_agent(
     user_message: str,
     conversation_history: list[dict],
     user_memory_context: str = "",
@@ -55,7 +55,7 @@ def run_engineering_agent(
     ]
 
     try:
-        result = call_groq(
+        result = await call_groq_async(
             messages=messages,
             system_prompt=ENGINEERING_SYSTEM_PROMPT,
             max_tokens=900,

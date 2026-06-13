@@ -3,7 +3,7 @@
 # Critic Agent — Devil's Advocate & Quality Guard
 # ========================
 
-from app.services.groq_service import call_groq
+from app.services.groq_service import call_groq_async
 import structlog
 
 logger = structlog.get_logger()
@@ -45,7 +45,7 @@ Structure your response as:
 Don't invent problems. Only flag real issues with real solutions."""
 
 
-def run_critic_agent(
+async def run_critic_agent(
     user_message: str,
     conversation_history: list[dict],
     engineering_output: str = "",
@@ -61,7 +61,7 @@ def run_critic_agent(
     ]
 
     try:
-        result = call_groq(
+        result = await call_groq_async(
             messages=messages,
             system_prompt=CRITIC_SYSTEM_PROMPT,
             max_tokens=700,

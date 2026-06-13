@@ -1,11 +1,12 @@
 "use client";
 // ================================================================
-// app/workspace/[id]/page.tsx  — FINAL COMPLETE
-// Phase 4: CommandPalette + Export + OrchestrationGraph + MemoryPanel
-// All Phase 3 features fully wired
+// app/workspace/[id]/page.tsx  — ROADMAP REFACTORED
+// - Centralized roadmap state in useWorkspaceStore
+// - Using RoadmapPanel component
+// - All API calls point to the correct projectService
 // ================================================================
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import ReactMarkdown from "react-markdown";
@@ -13,21 +14,22 @@ import remarkGfm from "remark-gfm";
 import { toast } from "sonner";
 
 import { useAuthStore } from "@/store/authStore";
+import { useWorkspaceStore } from "@/store/workspaceStore";
 import {
-  useProjects, useSessions, useMessages,
+  useProjects, useSessions,
   useCreateSession, useDeleteSession, useRenameSession,
 } from "@/hooks/useProjects";
 import { useChat } from "@/hooks/useChat";
-import { getRoadmap, updateTask } from "@/services/chatService";
+import { getRoadmap, generateRoadmap, updateRoadmapTask } from "@/services/projectService";
 import { cn } from "@/lib/utils";
 
-// Phase 4 components
 import { CommandPalette, useCommandPalette, type Command } from "@/components/ui/CommandPalette";
 import { ExportChat } from "@/components/export/ExportChat";
 import { AgentOrchestrationGraph } from "@/components/agents/AgentOrchestrationGraph";
 import { MemoryPanel } from "@/components/workspace/MemoryPanel";
+import { RoadmapPanel } from "@/components/roadmap/RoadmapPanel";
+import { Button } from "@/components/ui/Button";
 
-// ── Agent config ────────────────────────────────────────────────
 const AGENTS = [
   { key: "qa",          label: "QA",          icon: "🧠", color: "#818cf8" },
   { key: "research",    label: "Research",    icon: "🔍", color: "#34d399" },
@@ -39,27 +41,35 @@ const AGENTS = [
 
 type RightTab = "roadmap" | "memory" | "graph";
 
-// ================================================================
 export default function WorkspacePage() {
   const params    = useParams();
   const router    = useRouter();
   const projectId = params?.id as string;
 
   const { user, isAuthenticated } = useAuthStore();
+  const { 
+    activeProject, 
+    activeRoadmap, 
+    setActiveRoadmap, 
+    activeSession,
+    setActiveProject, 
+    setActiveSession, 
+  } = useWorkspaceStore();
+
 
   // UI state
-  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [sidebarOpen,     setSidebarOpen]     = useState(true);
   const [rightPanelOpen,  setRightPanelOpen]  = useState(false);
   const [rightTab,        setRightTab]        = useState<RightTab>("roadmap");
   const [inputValue,      setInputValue]      = useState("");
   const [isVoice,         setIsVoice]         = useState(false);
   const [expandedAgents,  setExpandedAgents]  = useState<Set<string>>(new Set());
-  const [roadmapData,     setRoadmapData]     = useState<any>(null);
   const [profileOpen,     setProfileOpen]     = useState(false);
   const [renameId,        setRenameId]        = useState<string | null>(null);
   const [renameVal,       setRenameVal]       = useState("");
-  const [lastQuery,       setLastQuery]       = useState("");  // for memory semantic search
+  const [lastQuery,       setLastQuery]       = useState("");
+  const [isGeneratingRoadmap, setIsGeneratingRoadmap] = useState(false);
+
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef       = useRef<HTMLTextAreaElement>(null);
@@ -71,16 +81,19 @@ export default function WorkspacePage() {
   const deleteSession            = useDeleteSession();
   const renameSession            = useRenameSession();
 
-  const { messages, agentEvents, isStreaming, sendMessage, setMessages } =
-    useChat(projectId, activeSessionId);
-
+  const { messages, agentEvents, isStreaming, sendMessage, setMessages } = useChat(projectId, activeSession?.id);
 
   // Command palette
   const { open: cmdOpen, setOpen: setCmdOpen } = useCommandPalette();
 
   // ── Effects ────────────────────────────────────────────────────
   useEffect(() => { if (!isAuthenticated) router.push("/auth/login"); }, [isAuthenticated, router]);
-
+  
+  useEffect(() => {
+    const proj = projects.find((p: any) => p.id === projectId);
+    if (proj) setActiveProject(proj);
+  }, [projectId, projects, setActiveProject]);
+  
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages.length, isStreaming]);
@@ -88,14 +101,12 @@ export default function WorkspacePage() {
   useEffect(() => {
     if (projectId) {
       getRoadmap(projectId)
-        .then(d => { if (d?.roadmap) setRoadmapData(d.roadmap); })
+        .then(data => { if (data) setActiveRoadmap(data); })
         .catch(() => {});
     }
-  }, [projectId, messages.length]);
+  }, [projectId, messages.length, setActiveRoadmap]);
 
   // ── Derived ────────────────────────────────────────────────────
-  const currentProject = projects.find((p: any) => p.id === projectId);
-  const currentSession = sessions.find((s: any) => s.id === activeSessionId);
   const initials       = user?.name?.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2) || "U";
 
   const getAgentStatus = (key: string) => {
@@ -115,7 +126,7 @@ export default function WorkspacePage() {
 
     try {
       const s = await createSession.mutateAsync({ projectId, data: { title: "New Chat" } });
-      setActiveSessionId(s.id);
+      setActiveSession(s);
     } catch (err) {
       console.error("Failed to create new session", err);
       toast.error("Unable to create a new chat. Try again.");
@@ -130,11 +141,11 @@ export default function WorkspacePage() {
     setLastQuery(msg);
 
     try {
-      let sessionId = activeSessionId;
+      let sessionId = activeSession?.id;
       if (!sessionId) {
         const s = await createSession.mutateAsync({ projectId, data: { title: msg.slice(0, 50) } });
         sessionId = s.id;
-        setActiveSessionId(s.id);
+        setActiveSession(s);
       }
 
       if (sessionId) {
@@ -149,12 +160,30 @@ export default function WorkspacePage() {
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); }
   };
+  
+  const handleGenerateRoadmap = async () => {
+    if (!activeProject) return;
+    setIsGeneratingRoadmap(true);
+    try {
+      const newRoadmap = await generateRoadmap(activeProject.id);
+      setActiveRoadmap(newRoadmap);
+      toast.success("Roadmap generated successfully!");
+    } catch (error: any) {
+      console.error("Failed to generate roadmap", error);
+      const detail = error.response?.data?.detail || "An unexpected error occurred.";
+      toast.error("Failed to generate roadmap", {
+        description: detail,
+      });
+    } finally {
+      setIsGeneratingRoadmap(false);
+    }
+  };
 
   const handleTaskToggle = async (taskId: string, completed: boolean) => {
+    if (!activeProject) return;
     try {
-      await updateTask(taskId, completed);
-      const d = await getRoadmap(projectId);
-      if (d?.roadmap) setRoadmapData(d.roadmap);
+      const updatedRoadmap = await updateRoadmapTask(activeProject.id, taskId, completed);
+      setActiveRoadmap(updatedRoadmap);
     } catch (err) {
       console.error("Failed to update roadmap task", err);
       toast.error("Unable to update task. Please try again.");
@@ -179,14 +208,11 @@ export default function WorkspacePage() {
     { id: "logout",       label: "Sign Out",         description: "Log out of workspace",       icon: "🚪",                      group: "Account",    action: () => { router.push("/auth/login"); } },
   ];
 
-  // ================================================================
   return (
     <div className="flex h-screen bg-[#080910] text-white overflow-hidden">
 
-      {/* ── COMMAND PALETTE ── */}
       <CommandPalette open={cmdOpen} onClose={() => setCmdOpen(false)} commands={commands} />
 
-      {/* ── SIDEBAR ── */}
       <AnimatePresence>
         {sidebarOpen && (
           <motion.aside
@@ -196,7 +222,6 @@ export default function WorkspacePage() {
             transition={{ type: "spring", stiffness: 320, damping: 32 }}
             className="w-[220px] flex-shrink-0 bg-[#0d0e16] border-r border-white/[0.06] flex flex-col z-10"
           >
-            {/* Header */}
             <div className="p-3.5 border-b border-white/[0.06]">
               <div className="flex items-center gap-2.5 mb-3">
                 <div className="w-7 h-7 rounded-[9px] bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center text-sm font-bold flex-shrink-0">✦</div>
@@ -206,7 +231,6 @@ export default function WorkspacePage() {
                 className="w-full flex items-center gap-2 px-3 py-2 rounded-lg bg-violet-500/10 border border-violet-500/25 text-violet-300 text-[12px] font-medium hover:bg-violet-500/18 transition-all">
                 <span className="text-base leading-none">+</span> New Chat
               </button>
-              {/* Cmd+K hint */}
               <button onClick={() => setCmdOpen(true)}
                 className="w-full mt-2 flex items-center gap-2 px-3 py-1.5 rounded-lg border border-white/[0.06] text-white/20 text-[11px] hover:border-white/[0.12] hover:text-white/40 transition-all">
                 <span>⌘</span><span className="flex-1 text-left">Command palette</span>
@@ -214,7 +238,6 @@ export default function WorkspacePage() {
               </button>
             </div>
 
-            {/* Projects list */}
             <div className="px-2.5 pt-3 pb-1">
               <p className="text-[9.5px] font-semibold text-white/25 uppercase tracking-widest px-2 mb-2">Projects</p>
               {projects.map((p: any) => (
@@ -229,7 +252,6 @@ export default function WorkspacePage() {
               ))}
             </div>
 
-            {/* Session list */}
             <div className="px-2.5 pt-2 pb-1 flex-1 overflow-y-auto min-h-0" style={{ scrollbarWidth: "none" }}>
               <p className="text-[9.5px] font-semibold text-white/25 uppercase tracking-widest px-2 mb-2">Chats</p>
               {sessions.map((s: any) => (
@@ -251,10 +273,10 @@ export default function WorkspacePage() {
                       onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); if (e.key === "Escape") setRenameId(null); }}
                       className="w-full px-2.5 py-2 bg-violet-500/10 border border-violet-500/30 rounded-lg text-[12px] text-white/80 outline-none" />
                   ) : (
-                    <button onClick={() => setActiveSessionId(s.id)}
+                    <button onClick={() => setActiveSession(s)}
                       className={cn(
                         "w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-left transition-all pr-14",
-                        s.id === activeSessionId ? "bg-white/[0.07] text-white/80" : "text-white/35 hover:bg-white/[0.04] hover:text-white/55"
+                        s.id === activeSession?.id ? "bg-white/[0.07] text-white/80" : "text-white/35 hover:bg-white/[0.04] hover:text-white/55"
                       )}>
                       <span className="text-[10px] opacity-50 flex-shrink-0">{s.mode === "voice" ? "🎤" : "💬"}</span>
                       <span className="text-[12px] truncate flex-1">{s.title}</span>
@@ -266,8 +288,8 @@ export default function WorkspacePage() {
                     <button onClick={async () => {
                       try {
                         await deleteSession.mutateAsync({ projectId, sessionId: s.id });
-                        if (activeSessionId === s.id) {
-                          setActiveSessionId(null);
+                        if (activeSession?.id === s.id) {
+                          setActiveSession(null);
                           setMessages([]);
                         }
                       } catch (err) {
@@ -284,7 +306,6 @@ export default function WorkspacePage() {
               )}
             </div>
 
-            {/* User footer */}
             <div className="p-2.5 border-t border-white/[0.06] relative">
               <button onClick={() => setProfileOpen(p => !p)}
                 className="w-full flex items-center gap-2.5 px-2 py-2 rounded-lg hover:bg-white/[0.04] transition-all">
@@ -296,7 +317,6 @@ export default function WorkspacePage() {
                 <span className="text-white/20 text-[11px]">⚙</span>
               </button>
 
-              {/* Profile dropdown */}
               <AnimatePresence>
                 {profileOpen && (
                   <motion.div
@@ -333,22 +353,19 @@ export default function WorkspacePage() {
         )}
       </AnimatePresence>
 
-      {/* ── MAIN AREA ── */}
       <div className="flex-1 flex flex-col min-w-0">
 
-        {/* Top bar */}
         <div className="h-12 border-b border-white/[0.06] flex items-center px-4 gap-3 flex-shrink-0 bg-[#080910]/90 backdrop-blur-sm">
           <button onClick={() => setSidebarOpen(p => !p)}
             className="w-7 h-7 flex items-center justify-center rounded-lg text-white/30 hover:text-white/60 hover:bg-white/[0.06] transition-all text-sm flex-shrink-0">☰</button>
 
           <div className="flex-1 min-w-0">
             <span className="text-[12.5px] font-medium text-white/50 truncate">
-              {currentProject?.name || "Workspace"}
-              {currentSession && <span className="text-white/25"> / {currentSession.title}</span>}
+              {activeProject?.name || "Workspace"}
+              {activeSession && <span className="text-white/25"> / {activeSession.title}</span>}
             </span>
           </div>
 
-          {/* Live agent chips */}
           <div className="hidden lg:flex items-center gap-1.5">
             {AGENTS.slice(1).map(a => {
               const st = getAgentStatus(a.key);
@@ -368,15 +385,12 @@ export default function WorkspacePage() {
             })}
           </div>
 
-          {/* Right panel buttons */}
           <div className="flex items-center gap-1.5 flex-shrink-0">
-            {/* Export */}
             <ExportChat
               messages={messages}
-              sessionTitle={currentSession?.title || "Chat"}
-              projectName={currentProject?.name || "Project"}
+              sessionTitle={activeSession?.title || "Chat"}
+              projectName={activeProject?.name || "Project"}
             />
-            {/* Panel tabs */}
             {(["roadmap", "memory", "graph"] as RightTab[]).map(tab => (
               <button key={tab} onClick={() => rightPanelOpen && rightTab === tab ? setRightPanelOpen(false) : openRight(tab)}
                 className={cn(
@@ -392,7 +406,6 @@ export default function WorkspacePage() {
           </div>
         </div>
 
-        {/* Agent activity bar */}
         <AnimatePresence>
           {agentEvents.length > 0 && isStreaming && (
             <motion.div
@@ -428,17 +441,13 @@ export default function WorkspacePage() {
           )}
         </AnimatePresence>
 
-        {/* Split: chat + right panel */}
         <div className="flex flex-1 min-h-0">
 
-          {/* ── CHAT PANEL ── */}
           <div className="flex-1 flex flex-col min-w-0">
 
-            {/* Messages */}
             <div className="flex-1 overflow-y-auto px-4 md:px-6 py-5 space-y-5"
               style={{ scrollbarWidth: "thin", scrollbarColor: "rgba(255,255,255,0.07) transparent" }}>
 
-              {/* Empty state */}
               {messages.length === 0 && !isStreaming && (
                 <div className="flex flex-col items-center justify-center h-full text-center gap-4 py-16">
                   <motion.div initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
@@ -470,7 +479,6 @@ export default function WorkspacePage() {
                 </div>
               )}
 
-              {/* Messages list */}
               {messages.map((msg, idx) => (
                 <motion.div key={msg.id}
                   initial={{ opacity: 0, y: 10 }}
@@ -478,7 +486,6 @@ export default function WorkspacePage() {
                   transition={{ duration: 0.2 }}
                   className={cn("flex gap-3", msg.role === "user" ? "flex-row-reverse" : "")}>
 
-                  {/* Avatar */}
                   <div className={cn(
                     "w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5",
                     msg.role === "user"
@@ -489,12 +496,10 @@ export default function WorkspacePage() {
                   </div>
 
                   <div className={cn("max-w-[78%] flex flex-col gap-2", msg.role === "user" ? "items-end" : "items-start")}>
-                    {/* Voice badge */}
                     {(msg as any).input_mode === "voice" && (
                       <span className="text-[10px] text-emerald-400 flex items-center gap-1">🎤 Voice input</span>
                     )}
 
-                    {/* Message bubble */}
                     <div className={cn(
                       "px-4 py-3 text-[13px] leading-relaxed",
                       msg.role === "user"
@@ -527,7 +532,6 @@ export default function WorkspacePage() {
                       ) : msg.content}
                     </div>
 
-                    {/* Agent output accordions */}
                     {msg.agent_outputs && Object.keys(msg.agent_outputs).length > 0 && (
                       <div className="w-full space-y-1.5">
                         {Object.entries(msg.agent_outputs).map(([agent, output]) => {
@@ -567,7 +571,6 @@ export default function WorkspacePage() {
                 </motion.div>
               ))}
 
-              {/* Thinking indicator */}
               {isStreaming && (messages.length === 0 || messages[messages.length - 1]?.role === "user") && (
                 <div className="flex gap-3">
                   <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-indigo-600 to-violet-600 flex items-center justify-center text-xs font-bold flex-shrink-0">✦</div>
@@ -584,7 +587,6 @@ export default function WorkspacePage() {
               <div ref={messagesEndRef} />
             </div>
 
-            {/* ── Input area ── */}
             <div className="px-4 md:px-6 pb-4 pt-2 flex-shrink-0">
               <div className={cn(
                 "flex items-end gap-2.5 bg-white/[0.04] border rounded-2xl px-4 py-3 transition-all",
@@ -614,7 +616,6 @@ export default function WorkspacePage() {
             </div>
           </div>
 
-          {/* ── RIGHT PANEL ── */}
           <AnimatePresence>
             {rightPanelOpen && (
               <motion.div
@@ -624,7 +625,6 @@ export default function WorkspacePage() {
                 transition={{ type: "spring", stiffness: 320, damping: 32 }}
                 className="border-l border-white/[0.06] flex flex-col bg-[#0d0e16] overflow-hidden flex-shrink-0"
               >
-                {/* Panel header */}
                 <div className="p-3.5 border-b border-white/[0.06] flex items-center justify-between flex-shrink-0">
                   <div className="flex gap-1.5">
                     {(["roadmap", "memory", "graph"] as RightTab[]).map(tab => (
@@ -639,32 +639,27 @@ export default function WorkspacePage() {
                   <button onClick={() => setRightPanelOpen(false)} className="w-6 h-6 rounded-lg flex items-center justify-center text-white/25 hover:text-white/55 hover:bg-white/[0.06] transition-all text-sm">✕</button>
                 </div>
 
-                {/* Panel content */}
                 <div className="flex-1 overflow-y-auto p-3.5" style={{ scrollbarWidth: "thin", scrollbarColor: "rgba(255,255,255,0.07) transparent" }}>
 
-                  {/* Roadmap tab */}
                   {rightTab === "roadmap" && (
-                    roadmapData ? (
-                      <RoadmapView roadmap={roadmapData} onTaskToggle={handleTaskToggle} />
+                    activeRoadmap ? (
+                      <RoadmapPanel roadmap={activeRoadmap} onTaskToggle={handleTaskToggle} />
                     ) : (
                       <div className="text-center py-14 px-3">
                         <div className="text-3xl mb-3">🗺️</div>
                         <div className="text-[12.5px] font-medium text-white/45 mb-2">No roadmap yet</div>
-                        <div className="text-[11.5px] text-white/25 leading-relaxed">Ask the agents to plan a project — a roadmap with checkboxes will appear here automatically.</div>
-                        <button onClick={() => { setInputValue("Create a detailed project roadmap and implementation plan for this project"); inputRef.current?.focus(); }}
-                          className="mt-4 px-4 py-2 bg-violet-500/10 border border-violet-500/25 text-violet-300 rounded-xl text-[12px] hover:bg-violet-500/18 transition-all">
-                          Generate Roadmap →
-                        </button>
+                        <div className="text-[11.5px] text-white/25 leading-relaxed">Ask the agents to plan a project, or generate one here.</div>
+                        <Button onClick={handleGenerateRoadmap} disabled={isGeneratingRoadmap} className="mt-4">
+                          {isGeneratingRoadmap ? "Generating..." : "Generate Roadmap"}
+                        </Button>
                       </div>
                     )
                   )}
 
-                  {/* Memory tab */}
                   {rightTab === "memory" && (
                     <MemoryPanel searchQuery={lastQuery || undefined} />
                   )}
 
-                  {/* Graph tab */}
                   {rightTab === "graph" && (
                     <div className="space-y-3">
                       <AgentOrchestrationGraph agents={agentNodes} isActive={isStreaming} />
@@ -685,79 +680,3 @@ export default function WorkspacePage() {
   );
 }
 
-// ── Inline RoadmapView ───────────────────────────────────────────
-function RoadmapView({ roadmap, onTaskToggle }: { roadmap: any; onTaskToggle: (id: string, done: boolean) => void }) {
-  const [expanded, setExpanded] = useState<Set<number>>(new Set([0]));
-  const tasksByPhase = (roadmap.tasks || []).reduce((acc: any, t: any) => {
-    if (!acc[t.phase_index]) acc[t.phase_index] = [];
-    acc[t.phase_index].push(t);
-    return acc;
-  }, {} as Record<number, any[]>);
-  const COLORS = ["#6366f1","#8b5cf6","#06b6d4","#10b981","#f59e0b"];
-
-  return (
-    <div className="space-y-2">
-      {/* Progress header */}
-      <div className="bg-white/[0.04] border border-white/[0.07] rounded-xl p-3 mb-3">
-        <div className="flex items-center justify-between mb-1.5">
-          <div className="text-[12.5px] font-semibold text-white/78">{roadmap.project_title}</div>
-          <div className="text-[13px] font-bold text-white/75">{roadmap.progress_percent}%</div>
-        </div>
-        <div className="text-[10px] text-white/30 mb-2">{roadmap.total_phases} phases · ~{roadmap.estimated_weeks}w · {roadmap.tasks_completed}/{roadmap.tasks_total} done</div>
-        <div className="h-1.5 bg-white/[0.07] rounded-full overflow-hidden">
-          <motion.div initial={{ width: 0 }} animate={{ width: `${roadmap.progress_percent}%` }} transition={{ duration: 0.8 }}
-            className="h-full rounded-full" style={{ background: "linear-gradient(90deg,#6366f1,#8b5cf6)" }} />
-        </div>
-      </div>
-
-      {(roadmap.phases || []).map((phase: any, pi: number) => {
-        const tasks = tasksByPhase[pi] || [];
-        const done  = tasks.filter((t: any) => t.completed).length;
-        const isOpen = expanded.has(pi);
-        return (
-          <div key={pi} className="bg-black/18 border border-white/[0.06] rounded-xl overflow-hidden">
-            <button onClick={() => setExpanded(prev => { const n = new Set(prev); n.has(pi) ? n.delete(pi) : n.add(pi); return n; })}
-              className="w-full flex items-center gap-2.5 p-3 hover:bg-white/[0.03] transition-all text-left">
-              <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: COLORS[pi % COLORS.length] }} />
-              <div className="flex-1 min-w-0">
-                <div className="text-[11.5px] font-medium text-white/68">Phase {pi+1}: {phase.name}</div>
-                <div className="text-[9.5px] text-white/28 truncate mt-0.5">{phase.goal}</div>
-              </div>
-              <span className="text-[9.5px] font-mono text-white/28 flex-shrink-0">{done}/{tasks.length}</span>
-              <span className="text-[9px] text-white/20 flex-shrink-0">{isOpen ? "▾" : "▸"}</span>
-            </button>
-            <AnimatePresence>
-              {isOpen && (
-                <motion.div initial={{ height: 0 }} animate={{ height: "auto" }} exit={{ height: 0 }} className="overflow-hidden">
-                  <div className="px-3 pb-3 space-y-1.5">
-                    {tasks.map((task: any) => (
-                      <div key={task.id} onClick={() => onTaskToggle(task.id, !task.completed)}
-                        className={cn("flex items-start gap-2.5 p-2 rounded-lg cursor-pointer transition-all border",
-                          task.completed ? "opacity-50 bg-emerald-500/5 border-emerald-500/10" : "border-white/[0.05] hover:bg-white/[0.04] hover:border-white/[0.1]"
-                        )}>
-                        <div className={cn("w-4 h-4 rounded border flex-shrink-0 mt-0.5 flex items-center justify-center text-[9px] transition-all",
-                          task.completed ? "bg-emerald-500 border-emerald-400 text-white" : "border-white/20"
-                        )}>{task.completed ? "✓" : ""}</div>
-                        <div className="flex-1 min-w-0">
-                          <div className={cn("text-[11.5px] font-medium leading-snug", task.completed ? "line-through text-white/28" : "text-white/62")}>{task.title}</div>
-                          <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-                            <span className={cn("text-[9px] px-1.5 py-0.5 rounded-full border font-medium",
-                              task.priority === "high"   ? "text-red-400 border-red-500/20 bg-red-500/8" :
-                              task.priority === "medium" ? "text-amber-400 border-amber-500/20 bg-amber-500/8" :
-                                                            "text-emerald-400 border-emerald-500/20 bg-emerald-500/8"
-                            )}>{task.priority}</span>
-                            <span className="text-[9px] text-white/22">~{task.estimated_hours}h</span>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-        );
-      })}
-    </div>
-  );
-}

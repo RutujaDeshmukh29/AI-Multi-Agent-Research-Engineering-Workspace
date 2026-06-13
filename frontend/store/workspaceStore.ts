@@ -4,7 +4,7 @@
 // ========================
 
 import { create } from "zustand";
-import type { Project, Session, Message } from "@/types";
+import type { Project, Session, Message, Roadmap } from "@/types";
 
 interface WorkspaceState {
   // Active state
@@ -13,6 +13,7 @@ interface WorkspaceState {
   messages: Message[];
   isAgentThinking: boolean;
   streamingContent: string;
+  activeRoadmap: Roadmap | null;
 
   // List state
   projects: Project[];
@@ -30,11 +31,13 @@ interface WorkspaceState {
   setStreamingContent: (content: string) => void;
   appendStreamingContent: (chunk: string) => void;
   resetSession: () => void;
+  setActiveRoadmap: (roadmap: Roadmap | null) => void;
 }
 
 export const useWorkspaceStore = create<WorkspaceState>()((set) => ({
   activeProject: null,
   activeSession: null,
+  activeRoadmap: null,
   messages: [],
   isAgentThinking: false,
   streamingContent: "",
@@ -65,4 +68,5 @@ export const useWorkspaceStore = create<WorkspaceState>()((set) => ({
     set((state) => ({ streamingContent: state.streamingContent + chunk })),
   resetSession: () =>
     set({ messages: [], streamingContent: "", isAgentThinking: false }),
+  setActiveRoadmap: (roadmap) => set({ activeRoadmap: roadmap }),
 }));
