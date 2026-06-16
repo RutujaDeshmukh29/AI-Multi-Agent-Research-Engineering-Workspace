@@ -20,7 +20,7 @@ import {
   useCreateSession, useDeleteSession, useRenameSession,
 } from "@/hooks/useProjects";
 import { useChat } from "@/hooks/useChat";
-import { getRoadmap, generateRoadmap, updateRoadmapTask } from "@/services/projectService";
+import { getRoadmap, generateRoadmap, updateRoadmapTask, deleteRoadmap } from "@/services/projectService";
 import { cn } from "@/lib/utils";
 
 import { CommandPalette, useCommandPalette, type Command } from "@/components/ui/CommandPalette";
@@ -176,6 +176,22 @@ export default function WorkspacePage() {
       });
     } finally {
       setIsGeneratingRoadmap(false);
+    }
+  };
+
+  const handleDeleteRoadmap = async () => {
+    if (!activeProject || !activeRoadmap) return;
+    if (!confirm("Are you sure you want to delete this roadmap?")) return;
+
+    try {
+      await deleteRoadmap(activeProject.id);
+      setActiveRoadmap(null);
+      toast.success("Roadmap deleted.");
+    } catch (error: any) {
+      console.error("Failed to delete roadmap", error);
+      toast.error("Failed to delete roadmap", {
+        description: error.response?.data?.detail || "An unexpected error occurred.",
+      });
     }
   };
 
@@ -643,7 +659,13 @@ export default function WorkspacePage() {
 
                   {rightTab === "roadmap" && (
                     activeRoadmap ? (
-                      <RoadmapPanel roadmap={activeRoadmap} onTaskToggle={handleTaskToggle} />
+                      <RoadmapPanel 
+                        roadmap={activeRoadmap} 
+                        onTaskToggle={handleTaskToggle}
+                        onRegenerate={handleGenerateRoadmap}
+                        onDelete={handleDeleteRoadmap}
+                        isGenerating={isGeneratingRoadmap}
+                      />
                     ) : (
                       <div className="text-center py-14 px-3">
                         <div className="text-3xl mb-3">🗺️</div>

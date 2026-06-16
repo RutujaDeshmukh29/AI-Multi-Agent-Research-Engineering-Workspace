@@ -262,7 +262,7 @@ async def get_roadmap_by_project_id(db: AsyncSession, project_id: uuid.UUID, use
     return result.scalar_one_or_none()
 
 
-async def update_task_completion(db: AsyncSession, project_id: uuid.UUID, user_id: uuid.UUID, task_id: str, completed: bool) -> Optional[ProjectRoadmap]:
+async def update_task_completion(db: AsyncSession, project_id: uuid.UUID, user_id: uuid.UUID, task_id: uuid.UUID, completed: bool) -> Optional[ProjectRoadmap]:
     """Update a single task's completion status and recalculate roadmap progress."""
     roadmap = await get_roadmap_by_project_id(db, project_id, user_id)
     if not roadmap:
@@ -271,8 +271,9 @@ async def update_task_completion(db: AsyncSession, project_id: uuid.UUID, user_i
     # Update the specific task
     task_to_update = None
     for task in roadmap.tasks:
-        if task.task_id == task_id:
+        if task.id == task_id:
             task.completed = completed
+            task.completed_at = datetime.now(timezone.utc) if completed else None
             task_to_update = task
             break
             
@@ -293,3 +294,16 @@ async def update_task_completion(db: AsyncSession, project_id: uuid.UUID, user_i
     
     # Re-fetch to get the updated state correctly, especially after the flush
     return await get_roadmap_by_project_id(db, project_id, user_id)
+
+
+async def delete_roadmap(db: AsyncSession, project_id: uuid.UUID, user_id: uuid.UUID) -> bool:
+    """
+    Deletes the roadmap for a given project and user.
+    """
+    roadmap = await get_roadmap_by_project_id(db, project_id, user_id)
+    if not roadmap:
+        return False
+        
+    await db.delete(roadmap)
+    await db.flush()
+    return True

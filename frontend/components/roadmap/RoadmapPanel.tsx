@@ -1,26 +1,26 @@
 "use client";
-// ========================
-// components/roadmap/RoadmapPanel.tsx
-// Interactive project roadmap with live progress tracking
-// Tasks are checkboxes — checking them updates progress in real-time
-// ========================
-
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/Button";
 
 interface RoadmapTask {
   id: string;
-  phase_id: string;
   title: string;
-  description?: string;
-  estimated_hours: number;
-  priority: "high" | "medium" | "low";
   completed: boolean;
-  completed_at?: string;
-  tags: string[];
+  priority: "high" | "medium" | "low";
+  estimated_hours: number;
+  description?: string;
+  tags?: string[];
   phase_index: number;
-  task_index: number;
+}
+
+interface RoadmapPhase {
+  id: string;
+  name: string;
+  goal: string;
+  week_start: number;
+  week_end: number;
 }
 
 interface RoadmapData {
@@ -29,15 +29,16 @@ interface RoadmapData {
   total_phases: number;
   estimated_weeks: number;
   progress_percent: number;
-  tasks_completed: number;
-  tasks_total: number;
-  phases: any[];
+  phases: RoadmapPhase[];
   tasks: RoadmapTask[];
 }
 
 interface RoadmapPanelProps {
   roadmap: RoadmapData;
   onTaskToggle: (taskId: string, completed: boolean) => Promise<void>;
+  onRegenerate: () => Promise<void>;
+  onDelete: () => Promise<void>;
+  isGenerating: boolean;
 }
 
 const PRIORITY_STYLES = {
@@ -46,12 +47,10 @@ const PRIORITY_STYLES = {
   low:    "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
 };
 
-const PHASE_COLORS = [
-  "#6366f1", "#8b5cf6", "#06b6d4", "#10b981", "#f59e0b"
-];
+const PHASE_COLORS = ["#6366f1", "#8b5cf6", "#06b6d4", "#10b981", "#f59e0b"];
 
-export function RoadmapPanel({ roadmap, onTaskToggle }: RoadmapPanelProps) {
-  const [expandedPhases, setExpandedPhases] = useState<Set<number>>(new Set([0]));
+export function RoadmapPanel({ roadmap, onTaskToggle, onRegenerate, onDelete, isGenerating }: RoadmapPanelProps) {
+  const [expandedPhases, setExpandedPhases] = useState<Set<number>>(new Set((roadmap.phases || []).map((_, i) => i)));
   const [loadingTasks, setLoadingTasks] = useState<Set<string>>(new Set());
 
   const togglePhase = (idx: number) => {
@@ -75,25 +74,24 @@ export function RoadmapPanel({ roadmap, onTaskToggle }: RoadmapPanelProps) {
     }
   };
 
-  // Group tasks by phase
-  const tasksByPhase = roadmap.tasks.reduce((acc, task) => {
+  const tasksByPhase = (roadmap.tasks || []).reduce((acc, task) => {
     const key = task.phase_index;
     if (!acc[key]) acc[key] = [];
     acc[key].push(task);
     return acc;
   }, {} as Record<number, RoadmapTask[]>);
 
+  const totalTasks = roadmap.tasks?.length || 0;
+  const completedTasks = (roadmap.tasks || []).filter(t => t.completed).length;
+
   return (
     <div className="bg-[#0d0e14] border border-white/8 rounded-2xl overflow-hidden">
-      {/* Header */}
       <div className="p-4 border-b border-white/6">
         <div className="flex items-center justify-between mb-3">
           <div>
-            <h3 className="text-sm font-semibold text-white/85">
-              🗺️ {roadmap.project_title}
-            </h3>
+            <h3 className="text-sm font-semibold text-white/85">🗺️ {roadmap.project_title}</h3>
             <p className="text-xs text-white/35 mt-0.5">
-              {roadmap.total_phases} phases · ~{roadmap.estimated_weeks} weeks · {roadmap.tasks_completed}/{roadmap.tasks_total} tasks
+              {roadmap.total_phases} phases · ~{roadmap.estimated_weeks} weeks · {completedTasks}/{totalTasks} tasks
             </p>
           </div>
           <div className="text-right">
@@ -101,8 +99,6 @@ export function RoadmapPanel({ roadmap, onTaskToggle }: RoadmapPanelProps) {
             <div className="text-[10px] text-white/35">complete</div>
           </div>
         </div>
-
-        {/* Progress bar */}
         <div className="h-1.5 bg-white/8 rounded-full overflow-hidden">
           <motion.div
             initial={{ width: 0 }}
@@ -114,9 +110,8 @@ export function RoadmapPanel({ roadmap, onTaskToggle }: RoadmapPanelProps) {
         </div>
       </div>
 
-      {/* Phases */}
       <div className="divide-y divide-white/5">
-        {roadmap.phases.map((phase, phaseIdx) => {
+        {(roadmap.phases || []).map((phase, phaseIdx) => {
           const phaseTasks = tasksByPhase[phaseIdx] || [];
           const doneInPhase = phaseTasks.filter(t => t.completed).length;
           const phaseColor = PHASE_COLORS[phaseIdx % PHASE_COLORS.length];
@@ -124,110 +119,47 @@ export function RoadmapPanel({ roadmap, onTaskToggle }: RoadmapPanelProps) {
 
           return (
             <div key={phase.id || phaseIdx}>
-              {/* Phase header */}
-              <button
-                onClick={() => togglePhase(phaseIdx)}
-                className="w-full px-4 py-3 flex items-center gap-3 hover:bg-white/3 transition-colors text-left"
-              >
-                <div
-                  className="w-2.5 h-2.5 rounded-full flex-shrink-0"
-                  style={{ background: phaseColor }}
-                />
+              <button onClick={() => togglePhase(phaseIdx)} className="w-full px-4 py-3 flex items-center gap-3 hover:bg-white/3 transition-colors text-left">
+                <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: phaseColor }} />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <span className="text-xs font-medium text-white/75">
-                      Phase {phaseIdx + 1}: {phase.name}
-                    </span>
-                    <span className="text-[10px] text-white/30">
-                      Wk {phase.week_start}–{phase.week_end}
-                    </span>
+                    <span className="text-xs font-medium text-white/75">Phase {phaseIdx + 1}: {phase.name}</span>
+                    <span className="text-[10px] text-white/30">Wk {phase.week_start}–{phase.week_end}</span>
                   </div>
                   <div className="text-[10px] text-white/30 mt-0.5 truncate">{phase.goal}</div>
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0">
-                  <span className="text-[10px] font-mono text-white/35">
-                    {doneInPhase}/{phaseTasks.length}
-                  </span>
-                  <div
-                    className="w-3 h-3 border border-white/20 rounded-sm flex items-center justify-center text-[8px] transition-transform"
-                    style={{ transform: isExpanded ? "rotate(90deg)" : "rotate(0deg)" }}
-                  >
-                    ›
-                  </div>
+                  <span className="text-[10px] font-mono text-white/35">{doneInPhase}/{phaseTasks.length}</span>
+                  <div className="w-3 h-3 border border-white/20 rounded-sm flex items-center justify-center text-[8px] transition-transform" style={{ transform: isExpanded ? "rotate(90deg)" : "rotate(0deg)" }}>›</div>
                 </div>
               </button>
 
-              {/* Tasks */}
               <AnimatePresence>
                 {isExpanded && (
-                  <motion.div
-                    initial={{ height: 0, opacity: 0 }}
-                    animate={{ height: "auto", opacity: 1 }}
-                    exit={{ height: 0, opacity: 0 }}
-                    transition={{ duration: 0.25 }}
-                    className="overflow-hidden"
-                  >
+                  <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.25 }} className="overflow-hidden">
                     <div className="px-4 pb-3 space-y-1.5">
                       {phaseTasks.map((task) => (
-                        <motion.div
-                          key={task.id}
-                          layout
-                          className={cn(
-                            "flex items-start gap-2.5 p-2.5 rounded-lg border transition-all cursor-pointer group",
-                            task.completed
-                              ? "bg-emerald-500/5 border-emerald-500/15 opacity-70"
-                              : "bg-white/3 border-white/8 hover:bg-white/5 hover:border-white/12"
-                          )}
-                          onClick={() => handleTaskToggle(task)}
-                        >
-                          {/* Checkbox */}
-                          <div
-                            className={cn(
-                              "w-4 h-4 rounded border flex-shrink-0 mt-0.5 flex items-center justify-center transition-all",
-                              task.completed
-                                ? "bg-emerald-500 border-emerald-400"
-                                : "border-white/25 group-hover:border-white/40"
-                            )}
-                          >
-                            {loadingTasks.has(task.id) ? (
-                              <div className="w-2 h-2 rounded-full border border-white/50 animate-spin border-t-transparent" />
-                            ) : task.completed ? (
-                              <svg viewBox="0 0 10 8" className="w-2.5 h-2.5" fill="none">
-                                <path d="M1 4l2.5 2.5L9 1" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                              </svg>
-                            ) : null}
+                        <motion.div key={task.id} layout
+                          className={cn("flex items-start gap-2.5 p-2.5 rounded-lg border transition-all group", task.completed ? "bg-emerald-500/5 border-emerald-500/15 opacity-70" : "bg-white/3 border-white/8")}>
+                          <div className="flex-shrink-0 mt-0.5">
+                            <input
+                              type="checkbox"
+                              checked={task.completed}
+                              onChange={() => handleTaskToggle(task)}
+                              disabled={loadingTasks.has(task.id)}
+                              className="w-4 h-4 rounded bg-white/5 border-white/25 text-indigo-500 focus:ring-indigo-600 focus:ring-offset-0 focus:ring-2 disabled:opacity-50"
+                            />
                           </div>
-
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 flex-wrap">
-                              <span className={cn(
-                                "text-xs font-medium",
-                                task.completed ? "line-through text-white/35" : "text-white/75"
-                              )}>
-                                {task.title}
-                              </span>
-                              <span className={cn(
-                                "text-[9px] px-1.5 py-0.5 rounded-full border font-medium",
-                                PRIORITY_STYLES[task.priority]
-                              )}>
-                                {task.priority}
-                              </span>
-                              <span className="text-[9px] text-white/25">
-                                ~{task.estimated_hours}h
-                              </span>
+                              <span className={cn("text-xs font-medium", task.completed ? "line-through text-white/35" : "text-white/75")}>{task.title}</span>
+                              <span className={cn("text-[9px] px-1.5 py-0.5 rounded-full border font-medium", PRIORITY_STYLES[task.priority])}>{task.priority}</span>
+                              <span className="text-[9px] text-white/25">~{task.estimated_hours}h</span>
                             </div>
-                            {task.description && (
-                              <p className="text-[10px] text-white/30 mt-0.5 leading-relaxed">
-                                {task.description}
-                              </p>
-                            )}
-                            {task.tags?.length > 0 && (
+                            {task.description && <p className="text-[10px] text-white/30 mt-0.5 leading-relaxed">{task.description}</p>}
+                            {task.tags && task.tags.length > 0 && (
                               <div className="flex gap-1 mt-1 flex-wrap">
-                                {task.tags.map(tag => (
-                                  <span key={tag} className="text-[9px] text-white/25 bg-white/5 px-1.5 py-0.5 rounded">
-                                    {tag}
-                                  </span>
-                                ))}
+                                {task.tags.map(tag => <span key={tag} className="text-[9px] text-white/25 bg-white/5 px-1.5 py-0.5 rounded">{tag}</span>)}
                               </div>
                             )}
                           </div>
@@ -240,6 +172,12 @@ export function RoadmapPanel({ roadmap, onTaskToggle }: RoadmapPanelProps) {
             </div>
           );
         })}
+      </div>
+      <div className="p-3 flex justify-end gap-2 border-t border-white/6 bg-black/10">
+        <Button onClick={onDelete} variant="destructive" size="sm" disabled={isGenerating}>Delete</Button>
+        <Button onClick={onRegenerate} variant="secondary" size="sm" disabled={isGenerating}>
+          {isGenerating ? "Generating..." : "Regenerate"}
+        </Button>
       </div>
     </div>
   );

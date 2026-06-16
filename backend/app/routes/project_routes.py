@@ -8,10 +8,12 @@
 # Cascade deletes handle cleanup automatically.
 # ========================
 
+from app.config import settings
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from pydantic import BaseModel
-from typing import Optional
+from pydantic import BaseModel, Field
+from typing import Optional, List
+from datetime import datetime
 import uuid
 import structlog
 
@@ -40,13 +42,13 @@ class ProjectUpdate(BaseModel):
     icon: Optional[str] = None
 
 class ProjectResponse(BaseModel):
-    id: str
+    id: uuid.UUID
     name: str
     description: Optional[str]
     color: Optional[str]
     icon: Optional[str]
-    created_at: str
-    updated_at: str
+    created_at: datetime
+    updated_at: datetime
 
     class Config:
         from_attributes = True
@@ -60,44 +62,45 @@ class SessionUpdate(BaseModel):
     is_pinned: Optional[bool] = None
 
 class SessionResponse(BaseModel):
-    id: str
-    project_id: str
+    id: uuid.UUID
+    project_id: uuid.UUID
     title: str
     mode: str
     is_pinned: bool
-    created_at: str
-    updated_at: str
+    created_at: datetime
+    updated_at: datetime
 
     class Config:
         from_attributes = True
 
 class RoadmapTaskResponse(BaseModel):
-    id: str
-    roadmap_id: str
+    id: uuid.UUID
+    roadmap_id: uuid.UUID
     phase_id: str
     task_id: str
     title: str
     description: Optional[str]
     estimated_hours: Optional[int]
     priority: Optional[str]
-    tags: Optional[list[str]]
+    tags: Optional[List[str]]
     completed: bool
-    completed_at: Optional[str]
+    completed_at: Optional[datetime]
+    phase_index: int
 
     class Config:
         from_attributes = True
 
 class RoadmapResponse(BaseModel):
-    id: str
-    project_id: str
+    id: uuid.UUID
+    project_id: uuid.UUID
     project_title: str
     total_phases: int
     estimated_weeks: int
     progress_percent: int
-    phases_json: dict
-    tasks: list[RoadmapTaskResponse]
-    created_at: str
-    updated_at: str
+    phases: List[dict]
+    tasks: List[RoadmapTaskResponse]
+    created_at: datetime
+    updated_at: datetime
 
     class Config:
         from_attributes = True
@@ -116,15 +119,7 @@ async def list_projects(
     user: User = Depends(get_current_user),
 ):
     """Get all projects for the current user (for sidebar)."""
-    projects = await crud.get_projects_by_user(db, user.id)
-    return [
-        ProjectResponse(
-            id=str(p.id), name=p.name, description=p.description,
-            color=p.color, icon=p.icon,
-            created_at=str(p.created_at), updated_at=str(p.updated_at),
-        )
-        for p in projects
-    ]
+    return await crud.get_projects_by_user(db, user.id)
 
 
 @router.post("/", response_model=ProjectResponse, status_code=status.HTTP_201_CREATED)
@@ -145,12 +140,7 @@ async def create_project(
         project.icon = body.icon
     await db.flush()
     await db.refresh(project) # Refresh the project object to load all attributes
-
-    return ProjectResponse(
-        id=str(project.id), name=project.name, description=project.description,
-        color=project.color, icon=project.icon,
-        created_at=str(project.created_at), updated_at=str(project.updated_at),
-    )
+    return project
 
 
 @router.patch("/{project_id}", response_model=ProjectResponse)
@@ -176,12 +166,7 @@ async def update_project(
         project.icon = body.icon
     await db.flush()
     await db.refresh(project)
-
-    return ProjectResponse(
-        id=str(project.id), name=project.name, description=project.description,
-        color=project.color, icon=project.icon,
-        created_at=str(project.created_at), updated_at=str(project.updated_at),
-    )
+    return project
 
 
 @router.delete("/{project_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -209,15 +194,7 @@ async def list_sessions(
 ):
     """Get all sessions for a project (chat history sidebar)."""
     pid = uuid.UUID(project_id)
-    sessions = await crud.get_sessions_by_project(db, pid, user.id)
-    return [
-        SessionResponse(
-            id=str(s.id), project_id=str(s.project_id),
-            title=s.title, mode=s.mode, is_pinned=s.is_pinned,
-            created_at=str(s.created_at), updated_at=str(s.updated_at),
-        )
-        for s in sessions
-    ]
+    return await crud.get_sessions_by_project(db, pid, user.id)
 
 
 @router.post("/{project_id}/sessions", response_model=SessionResponse, status_code=201)
@@ -239,12 +216,7 @@ async def create_session(
     if body.mode:
         session.mode = body.mode
     await db.flush()
-
-    return SessionResponse(
-        id=str(session.id), project_id=str(session.project_id),
-        title=session.title, mode=session.mode, is_pinned=session.is_pinned,
-        created_at=str(session.created_at), updated_at=str(session.updated_at),
-    )
+    return session
 
 
 @router.patch("/{project_id}/sessions/{session_id}", response_model=SessionResponse)
@@ -267,12 +239,7 @@ async def update_session(
         session.is_pinned = body.is_pinned
     await db.flush()
     await db.refresh(session)
-
-    return SessionResponse(
-        id=str(session.id), project_id=str(session.project_id),
-        title=session.title, mode=session.mode, is_pinned=session.is_pinned,
-        created_at=str(session.created_at), updated_at=str(session.updated_at),
-    )
+    return session
 
 
 @router.delete("/{project_id}/sessions/{session_id}", status_code=204)
@@ -332,7 +299,11 @@ async def get_roadmap(
     roadmap = await crud.get_roadmap_by_project_id(db, pid, user.id)
     if not roadmap:
         return None
-    return roadmap
+    
+    return RoadmapResponse(
+        **roadmap.__dict__,
+        phases=roadmap.phases_json.get("phases", []) if roadmap.phases_json else []
+    )
 
 @router.post("/{project_id}/roadmap/generate", response_model=RoadmapResponse)
 async def generate_roadmap(
@@ -359,14 +330,20 @@ async def generate_roadmap(
         roadmap_json = await generate_roadmap_json(project.name, fake_history)
 
         if not roadmap_json:
-            raise HTTPException(status_code=500, detail="Failed to generate roadmap from AI agent after self-correction.")
+            raise HTTPException(status_code=500, detail="The AI agent returned an empty or invalid response. Please try again.")
 
         new_roadmap = await crud.create_or_update_roadmap(db, pid, user.id, roadmap_json)
 
         if not new_roadmap:
             raise HTTPException(status_code=500, detail="Failed to save roadmap to database.")
 
-        return new_roadmap
+        return RoadmapResponse(
+            **new_roadmap.__dict__,
+            phases=new_roadmap.phases_json.get("phases", []) if new_roadmap.phases_json else []
+        )
+    except Exception as e:
+        logger.error("Roadmap generation failed at the route level", error=str(e), exc_info=True)
+        raise HTTPException(status_code=500, detail=f"An unexpected error occurred while generating the roadmap.")
     except Exception as e:
         logger.error("Roadmap generation failed at the route level", error=str(e), exc_info=True)
         raise HTTPException(status_code=500, detail=f"An unexpected error occurred while generating the roadmap.")
@@ -382,10 +359,28 @@ async def update_roadmap_task(
 ):
     """Mark a roadmap task as complete or incomplete."""
     pid = uuid.UUID(project_id)
+    tid = uuid.UUID(task_id)
+    
     updated_roadmap = await crud.update_task_completion(
-        db, project_id=pid, user_id=user.id, task_id=task_id, completed=body.completed
+        db, project_id=pid, user_id=user.id, task_id=tid, completed=body.completed
     )
     if not updated_roadmap:
         raise HTTPException(status_code=404, detail="Roadmap or task not found.")
     
-    return updated_roadmap
+    return RoadmapResponse(
+        **updated_roadmap.__dict__,
+        phases=updated_roadmap.phases_json.get("phases", []) if updated_roadmap.phases_json else []
+    )
+
+@router.delete("/{project_id}/roadmap", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_roadmap_endpoint(
+    project_id: str,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Deletes the roadmap for a project."""
+    pid = uuid.UUID(project_id)
+    success = await crud.delete_roadmap(db, project_id=pid, user_id=user.id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Roadmap not found.")
+    return None

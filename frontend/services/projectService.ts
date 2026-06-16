@@ -58,3 +58,7 @@ export async function updateRoadmapTask(projectId: string, taskId: string, compl
   const r = await api.put(`/api/projects/${projectId}/roadmap/tasks/${taskId}`, { completed });
   return r.data;
 }
+
+export async function deleteRoadmap(projectId: string) {
+  await api.delete(`/api/projects/${projectId}/roadmap`);
+}

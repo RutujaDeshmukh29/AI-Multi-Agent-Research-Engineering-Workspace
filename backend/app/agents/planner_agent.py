@@ -180,7 +180,10 @@ async def generate_roadmap_json(
             max_tokens=2048,
         )
         
-        if not markdown_text:
+        logger.info("Raw response from Groq for roadmap generation", response=markdown_text)
+
+        if not markdown_text or not markdown_text.strip():
+            logger.error("Groq returned an empty or whitespace-only response for roadmap generation.")
             return None
             
         roadmap_json = _parse_roadmap_markdown(markdown_text, project_description)
