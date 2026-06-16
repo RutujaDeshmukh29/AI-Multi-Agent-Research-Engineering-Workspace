@@ -13,6 +13,7 @@ from sqlalchemy import select, update, delete
 from sqlalchemy.orm import selectinload
 from typing import Optional
 import uuid
+from datetime import datetime, timezone
 
 from app.database.models import User, Project, Session, Message, UserMemory, SessionMemory, ProjectRoadmap, RoadmapTask
 
