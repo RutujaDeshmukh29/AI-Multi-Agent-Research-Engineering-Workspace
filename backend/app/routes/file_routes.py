@@ -114,3 +114,29 @@ async def upload_project_file(
 
     return {"filename": file.filename, "detail": "File processed and embeddings created."}
 
+
+@router.get("/projects/{project_id}/files")
+async def get_files(
+    project_id: str,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Get all files uploaded to a project."""
+    pid = uuid.UUID(project_id)
+    project = await crud.get_project_by_id(db, pid, user.id)
+    if not project:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
+
+    files = await crud.get_project_files(db, pid)
+    return [
+        {
+            "id": str(f.id),
+            "file_name": f.file_name,
+            "file_type": f.file_type,
+            "file_size": f.file_size,
+            "status": f.status,
+            "created_at": str(f.created_at)
+        }
+        for f in files
+    ]
+

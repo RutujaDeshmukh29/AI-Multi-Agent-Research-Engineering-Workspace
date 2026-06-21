@@ -67,3 +67,31 @@ export function useRenameSession() {
     onSuccess: (_, vars) => qc.invalidateQueries({ queryKey: ["sessions", vars.projectId] }),
   });
 }
+
+export function useProjectFiles(projectId: string | null) {
+  const { isAuthenticated } = useAuthStore();
+  return useQuery({
+    queryKey: ["project-files", projectId],
+    queryFn: () => projectService.getProjectFiles(projectId!),
+    enabled: isAuthenticated && !!projectId,
+    staleTime: 1000 * 30,
+  });
+}
+
+export function useProjectSummary(projectId: string | null) {
+  const { isAuthenticated } = useAuthStore();
+  return useQuery({
+    queryKey: ["project-summary", projectId],
+    queryFn: () => projectService.getProjectSummary(projectId!),
+    enabled: isAuthenticated && !!projectId,
+    staleTime: 1000 * 60 * 5, // cache for 5 minutes
+  });
+}
+
+export function useGenerateProjectSummary() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (projectId: string) => projectService.generateProjectSummary(projectId),
+    onSuccess: (_, projectId) => qc.invalidateQueries({ queryKey: ["project-summary", projectId] }),
+  });
+}

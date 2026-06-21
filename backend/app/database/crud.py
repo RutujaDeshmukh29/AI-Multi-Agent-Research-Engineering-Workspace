@@ -362,3 +362,10 @@ async def get_file_chunks_for_project(db: AsyncSession, project_id: uuid.UUID) -
     )
     return list(result.scalars().all())
 
+async def get_project_files(db: AsyncSession, project_id: uuid.UUID) -> list[ProjectFile]:
+    """Retrieve all file records associated with a project."""
+    result = await db.execute(
+        select(ProjectFile).where(ProjectFile.project_id == project_id)
+    )
+    return list(result.scalars().all())
+

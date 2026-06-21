@@ -164,4 +164,32 @@
   .agent-pulse {
     animation: agentThinking 1.5s ease-in-out infinite;
   }
+
+  /* Animated Grid Background */
+  .animated-grid {
+    background-size: 50px 50px;
+    background-image: linear-gradient(to right, rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+                      linear-gradient(to bottom, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+  }
+
+  /* Glass Card */
+  .glass-card {
+    backdrop-filter: blur(16px);
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+  }
+
+  /* Glow Card on Hover */
+  .card-glow:hover {
+    box-shadow: 0 0 35px rgba(139, 92, 246, 0.16);
+    border-color: rgba(139, 92, 246, 0.28) !important;
+  }
+
+  /* Gradient Text */
+  .gradient-text {
+    background: linear-gradient(90deg, #a855f7, #ec4899, #3b82f6);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+  }
 }

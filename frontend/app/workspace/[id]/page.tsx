@@ -16,9 +16,10 @@ import { toast } from "sonner";
 import { useAuthStore } from "@/store/authStore";
 import { useWorkspaceStore } from "@/store/workspaceStore";
 import {
-  useProjects, useSessions,
+  useProjects, useSessions, useProjectFiles,
   useCreateSession, useDeleteSession, useRenameSession,
 } from "@/hooks/useProjects";
+import { ProjectDashboard } from "@/components/workspace/ProjectDashboard";
 import { useChat } from "@/hooks/useChat";
 import { getRoadmap, generateRoadmap, updateRoadmapTask, deleteRoadmap, uploadProjectFile } from "@/services/projectService";
 import { cn } from "@/lib/utils";
@@ -259,8 +260,11 @@ export default function WorkspacePage() {
   
   useEffect(() => {
     const proj = projects.find((p: any) => p.id === projectId);
-    if (proj) setActiveProject(proj);
-  }, [projectId, projects, setActiveProject]);
+    if (proj) {
+      setActiveProject(proj);
+      setActiveSession(null);
+    }
+  }, [projectId, projects, setActiveProject, setActiveSession]);
   
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -679,7 +683,19 @@ export default function WorkspacePage() {
             <div className="flex-1 overflow-y-auto px-4 md:px-6 py-5 space-y-5"
               style={{ scrollbarWidth: "thin", scrollbarColor: "rgba(255,255,255,0.07) transparent" }}>
 
-              {messages.length === 0 && !isStreaming && (
+              {!activeSession ? (
+                <ProjectDashboard
+                  projectId={projectId}
+                  activeProject={activeProject}
+                  sessions={sessions}
+                  onSelectSession={setActiveSession}
+                  onNewChat={handleNewSession}
+                  agentUsageStats={agentUsageStats}
+                  activeRoadmap={activeRoadmap}
+                />
+              ) : (
+                <>
+                  {messages.length === 0 && !isStreaming && (
                 <div className="flex flex-col items-center justify-center h-full text-center gap-4 py-16">
                   <motion.div initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
                     className="text-5xl mb-1">✦</motion.div>
@@ -902,6 +918,8 @@ export default function WorkspacePage() {
                   </div>
                 </div>
               )}
+                </>
+              )}
 
               <div ref={messagesEndRef} />
             </div>
@@ -916,7 +934,7 @@ export default function WorkspacePage() {
                 <textarea ref={inputRef} value={inputValue}
                   onChange={e => { setInputValue(e.target.value); e.target.style.height = "auto"; e.target.style.height = Math.min(e.target.scrollHeight, 120) + "px"; }}
                   onKeyDown={handleKeyDown}
-                  placeholder={isListening ? "Listening... Speak now!" : "Ask the agents anything… (Enter to send, Shift+Enter for newline)"}
+                  placeholder={isListening ? "Listening... Speak now!" : !activeSession ? "Type a prompt to start a new chat in this project..." : "Ask the agents anything… (Enter to send, Shift+Enter for newline)"}
                   rows={1} disabled={isStreaming}
                   className="flex-1 bg-transparent outline-none text-[13px] text-white/80 placeholder-white/18 leading-relaxed resize-none min-h-[22px]"
                   style={{ maxHeight: "120px" }}

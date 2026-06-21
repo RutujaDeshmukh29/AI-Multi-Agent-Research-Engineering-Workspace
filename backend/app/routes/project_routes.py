@@ -16,6 +16,9 @@ from typing import Optional, List
 from datetime import datetime
 import uuid
 import structlog
+from pathlib import Path
+import json
+from app.services.groq_service import call_groq_async
 
 from app.database.db import get_db
 from app.database import crud
@@ -384,3 +387,133 @@ async def delete_roadmap_endpoint(
     if not success:
         raise HTTPException(status_code=404, detail="Roadmap not found.")
     return None
+
+
+class ProjectSummaryResponse(BaseModel):
+    goals: str
+    roadmap: str
+    decisions: str
+    architecture: str
+    risks: str
+    next_steps: str
+
+UPLOADS_DIR = Path("backend/uploads")
+
+@router.get("/{project_id}/summary", response_model=Optional[ProjectSummaryResponse])
+async def get_project_summary(
+    project_id: str,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Get the cached AI project summary if it exists."""
+    pid = uuid.UUID(project_id)
+    project = await crud.get_project_by_id(db, pid, user.id)
+    if not project:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
+
+    summary_file = UPLOADS_DIR / str(pid) / "summary.json"
+    if not summary_file.exists():
+        return None
+        
+    try:
+        with summary_file.open("r", encoding="utf-8") as f:
+            data = json.load(f)
+            return ProjectSummaryResponse(**data)
+    except Exception as e:
+        logger.error("Failed to read project summary file", error=str(e))
+        return None
+
+
+@router.post("/{project_id}/summary", response_model=ProjectSummaryResponse)
+async def generate_project_summary(
+    project_id: str,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Generate an AI Project Summary based on project sessions, chat logs, and roadmap."""
+    pid = uuid.UUID(project_id)
+    project = await crud.get_project_by_id(db, pid, user.id)
+    if not project:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
+
+    # 1. Fetch project sessions and their messages to summarize context
+    sessions = await crud.get_project_sessions(db, pid, user.id)
+    chat_history_summary = []
+    
+    for s in sessions[:5]: # look at last 5 chat sessions
+        messages = await crud.get_session_messages(db, s.id)
+        chat_history_summary.append(f"Chat: {s.title}")
+        for m in messages[-10:]: # summarize last 10 messages of each chat
+            chat_history_summary.append(f"  {m.role}: {m.content[:200]}")
+            
+    chat_logs = "\n".join(chat_history_summary)
+
+    # 2. Fetch project roadmap checklist
+    roadmap = await crud.get_project_roadmap(db, pid, user.id)
+    roadmap_tasks = []
+    if roadmap:
+        phases = roadmap.phases_json.get("phases", []) if roadmap.phases_json else []
+        for phase in phases:
+            tasks = phase.get("tasks", [])
+            for task in tasks:
+                status_str = "completed" if task.get("completed") else "pending"
+                roadmap_tasks.append(f"- {task.get('title')} ({status_str})")
+    
+    roadmap_checklist = "\n".join(roadmap_tasks)
+
+    # 3. Formulate Prompt for Groq
+    system_prompt = (
+        "You are an elite software product manager agent. Your job is to write a comprehensive AI Project Summary.\n"
+        "Given the recent chat logs and roadmap task completion statuses, generate a clear product summary.\n"
+        "Respond STRICTLY in JSON format with these exact keys:\n"
+        "{\n"
+        '  "goals": "High-level goals of this project...",\n'
+        '  "roadmap": "Milestone progression status...",\n'
+        '  "decisions": "Key architectural and product decisions aligned...",\n'
+        '  "architecture": "Overview of the project stack and layout...",\n'
+        '  "risks": "Identified security, rate limit, complexity, or design risks...",\n'
+        '  "next_steps": "Actionable immediate tasks to build next..."\n'
+        "}\n"
+        "Do NOT return markdown fences or conversational wrappers. Provide ONLY valid raw JSON."
+    )
+    
+    user_prompt = (
+        f"Project Name: {project.name}\n"
+        f"Project Description: {project.description}\n\n"
+        f"Recent Chat logs context:\n{chat_logs[:4000]}\n\n"
+        f"Roadmap items status:\n{roadmap_checklist[:2000]}\n"
+    )
+
+    try:
+        response_text = await call_groq_async(
+            messages=[{"role": "user", "content": user_prompt}],
+            system_prompt=system_prompt,
+            max_tokens=2500,
+            temperature=0.3
+        )
+        
+        clean_text = response_text.replace("```json", "").replace("```", "").strip()
+        data = json.loads(clean_text)
+        
+        # Save to uploads directory for caching
+        project_dir = UPLOADS_DIR / str(pid)
+        project_dir.mkdir(parents=True, exist_ok=True)
+        summary_file = project_dir / "summary.json"
+        
+        with summary_file.open("w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+            
+        return ProjectSummaryResponse(**data)
+        
+    except Exception as e:
+        logger.error("AI project summary generation failed", error=str(e))
+        # Provide fallback content in case of error
+        fallback_data = {
+            "goals": f"Develop and build '{project.name}' to solve the user's design requirements.",
+            "roadmap": "Currently in design and initialization phase.",
+            "decisions": "Adopted decoupled client-server architecture using FastAPI and Next.js.",
+            "architecture": "Next.js React frontend talking to a Python FastAPI backend.",
+            "risks": "Third-party API rate limits and token availability.",
+            "next_steps": "1. Initialize core workspace chats\n2. Populate roadmap backlog checklists."
+        }
+        return ProjectSummaryResponse(**fallback_data)

@@ -75,3 +75,18 @@ export async function uploadProjectFile(projectId: string, file: File) {
   });
   return r.data;
 }
+
+export async function getProjectFiles(projectId: string) {
+  const r = await api.get(`/api/projects/${projectId}/files`);
+  return r.data;
+}
+
+export async function getProjectSummary(projectId: string) {
+  const r = await api.get(`/api/projects/${projectId}/summary`);
+  return r.data;
+}
+
+export async function generateProjectSummary(projectId: string) {
+  const r = await api.post(`/api/projects/${projectId}/summary`);
+  return r.data;
+}
