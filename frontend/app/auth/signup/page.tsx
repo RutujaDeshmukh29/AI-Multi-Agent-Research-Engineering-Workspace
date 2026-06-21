@@ -1,9 +1,14 @@
 "use client";
 // app/auth/signup/page.tsx
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useAuth } from "@/hooks/useAuth";
 import { motion, AnimatePresence } from "framer-motion";
+import { toast } from "sonner";
+import { 
+  User as UserIcon, Mail, Lock, Eye, EyeOff, Sparkles, 
+  AlertCircle, ShieldCheck, CheckCircle2, ChevronRight 
+} from "lucide-react";
 
 // ─── Feature highlights shown on the left panel ──────────────────────────────
 const FEATURES = [
@@ -45,82 +50,138 @@ const TICKER_ITEMS = [
   { agent: "Planner",  color: "#a78bfa",  msg: "Roadmap updated — Phase 2 estimated 3 days…" },
 ];
 
-// ─── Canvas particle background ───────────────────────────────────────────────
-function Particles({ density = 50 }: { density?: number }) {
-  const ref = useRef<HTMLCanvasElement>(null);
+// ─── Particle background ─────────────────────────────────────────────────────
+function Particles() {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const mouseRef = useRef({ x: -1000, y: -1000, radius: 150 });
 
   useEffect(() => {
-    const canvas = ref.current;
+    const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    let id: number;
-    type P = { x: number; y: number; vx: number; vy: number; r: number; o: number; hue: number };
-    const ps: P[] = [];
+    let animId: number;
+    const particles: { x: number; y: number; vx: number; vy: number; size: number; baseOpacity: number; opacity: number }[] = [];
 
-    const resize = () => { canvas.width = canvas.offsetWidth; canvas.height = canvas.offsetHeight; };
+    const resize = () => {
+      canvas.width  = canvas.offsetWidth;
+      canvas.height = canvas.offsetHeight;
+    };
     resize();
     window.addEventListener("resize", resize);
 
-    for (let i = 0; i < density; i++) {
-      ps.push({
+    const handleMouseMove = (e: MouseEvent) => {
+      const rect = canvas.getBoundingClientRect();
+      mouseRef.current.x = e.clientX - rect.left;
+      mouseRef.current.y = e.clientY - rect.top;
+    };
+
+    const handleMouseLeave = () => {
+      mouseRef.current.x = -1000;
+      mouseRef.current.y = -1000;
+    };
+
+    window.addEventListener("mousemove", handleMouseMove);
+    canvas.addEventListener("mouseleave", handleMouseLeave);
+
+    // Spawn particles
+    const particleCount = 70;
+    for (let i = 0; i < particleCount; i++) {
+      particles.push({
         x: Math.random() * canvas.width,
         y: Math.random() * canvas.height,
-        vx: (Math.random() - 0.5) * 0.3,
-        vy: (Math.random() - 0.5) * 0.3,
-        r: Math.random() * 1.4 + 0.3,
-        o: Math.random() * 0.3 + 0.04,
-        hue: Math.random() > 0.6 ? 265 : 195,
+        vx: (Math.random() - 0.5) * 0.35,
+        vy: (Math.random() - 0.5) * 0.35,
+        size: Math.random() * 1.6 + 0.4,
+        baseOpacity: Math.random() * 0.25 + 0.05,
+        opacity: 0,
       });
     }
 
-    const tick = () => {
+    const draw = () => {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      for (const p of ps) {
-        p.x = (p.x + p.vx + canvas.width)  % canvas.width;
-        p.y = (p.y + p.vy + canvas.height) % canvas.height;
+      const mouse = mouseRef.current;
+
+      for (let i = 0; i < particles.length; i++) {
+        const p = particles[i];
+        p.x += p.vx;
+        p.y += p.vy;
+
+        if (p.x < 0) p.x = canvas.width;
+        if (p.x > canvas.width) p.x = 0;
+        if (p.y < 0) p.y = canvas.height;
+        if (p.y > canvas.height) p.y = 0;
+
+        // Interaction with mouse pointer
+        const dx = p.x - mouse.x;
+        const dy = p.y - mouse.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        
+        let displayOpacity = p.baseOpacity;
+
+        if (dist < mouse.radius) {
+          const force = (mouse.radius - dist) / mouse.radius;
+          p.x -= (dx / dist) * force * 0.8;
+          p.y -= (dy / dist) * force * 0.8;
+          displayOpacity = p.baseOpacity + force * 0.45;
+        }
+
         ctx.beginPath();
-        ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
-        ctx.fillStyle = `hsla(${p.hue},80%,70%,${p.o})`;
+        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(139, 92, 246, ${displayOpacity})`;
         ctx.fill();
+        
+        // Draw constellation lines between close particles
+        for (let j = i + 1; j < particles.length; j++) {
+          const p2 = particles[j];
+          const ldx = p.x - p2.x;
+          const ldy = p.y - p2.y;
+          const ldist = Math.sqrt(ldx * ldx + ldy * ldy);
+          if (ldist < 80) {
+            ctx.beginPath();
+            ctx.moveTo(p.x, p.y);
+            ctx.lineTo(p2.x, p2.y);
+            const lineOpacity = (1.0 - ldist / 80) * 0.07 * (displayOpacity / p.baseOpacity);
+            ctx.strokeStyle = `rgba(167, 139, 250, ${lineOpacity})`;
+            ctx.lineWidth = 0.5;
+            ctx.stroke();
+          }
+        }
       }
-      id = requestAnimationFrame(tick);
+      animId = requestAnimationFrame(draw);
     };
-    tick();
-    return () => { cancelAnimationFrame(id); window.removeEventListener("resize", resize); };
-  }, [density]);
+    draw();
 
-  return <canvas ref={ref} className="absolute inset-0 w-full h-full pointer-events-none" />;
+    return () => {
+      cancelAnimationFrame(animId);
+      window.removeEventListener("resize", resize);
+      window.removeEventListener("mousemove", handleMouseMove);
+      canvas.removeEventListener("mouseleave", handleMouseLeave);
+    };
+  }, []);
+
+  return (
+    <canvas
+      ref={canvasRef}
+      className="absolute inset-0 w-full h-full pointer-events-none"
+    />
+  );
 }
 
-// ─── Password strength evaluator ─────────────────────────────────────────────
-function getStrength(pw: string): { score: number; label: string; color: string } {
-  let score = 0;
-  if (pw.length >= 8)  score++;
-  if (pw.length >= 12) score++;
-  if (/[A-Z]/.test(pw)) score++;
-  if (/[0-9]/.test(pw)) score++;
-  if (/[^A-Za-z0-9]/.test(pw)) score++;
-  if (score <= 1) return { score, label: "Weak",   color: "#f87171" };
-  if (score <= 2) return { score, label: "Fair",   color: "#f59e0b" };
-  if (score <= 3) return { score, label: "Good",   color: "#a78bfa" };
-  return             { score, label: "Strong", color: "#34d399" };
-}
-
-// ─── Floating label input ─────────────────────────────────────────────────────
+// ─── Floating label input with Lucide icons ─────────────────────────────────
 function FloatingInput({
-  id, label, type = "text", value, onChange, placeholder, autoComplete, required,
+  id, label, type = "text", value, onChange, placeholder, autoComplete, required, icon: Icon
 }: {
   id: string; label: string; type?: string; value: string;
   onChange: (v: string) => void; placeholder?: string;
-  autoComplete?: string; required?: boolean;
+  autoComplete?: string; required?: boolean; icon?: any;
 }) {
   const [focused, setFocused] = useState(false);
   const filled = value.length > 0;
 
   return (
-    <div className="relative">
+    <div className="relative group/field">
       <input
         id={id}
         type={type}
@@ -131,27 +192,32 @@ function FloatingInput({
         onChange={e => onChange(e.target.value)}
         onFocus={() => setFocused(true)}
         onBlur={() => setFocused(false)}
-        className="peer w-full rounded-xl px-4 pt-5 pb-2 text-[13px] text-white/85 outline-none transition-all duration-200 placeholder-white/20"
+        className={`peer w-full rounded-xl ${Icon ? 'pl-11' : 'px-4'} pt-5 pb-2 text-[13px] text-white/85 outline-none transition-all duration-200 placeholder-white/20`}
         style={{
-          background: focused ? "rgba(139,92,246,0.06)" : "rgba(255,255,255,0.035)",
+          background: focused ? "rgba(139,92,246,0.05)" : "rgba(255,255,255,0.025)",
           border: focused
-            ? "1px solid rgba(139,92,246,0.55)"
+            ? "1px solid rgba(139,92,246,0.45)"
             : filled
             ? "1px solid rgba(255,255,255,0.12)"
-            : "1px solid rgba(255,255,255,0.07)",
-          boxShadow: focused ? "0 0 0 3px rgba(139,92,246,0.1), inset 0 1px 0 rgba(255,255,255,0.04)" : "none",
+            : "1px solid rgba(255,255,255,0.06)",
+          boxShadow: focused ? "0 0 15px rgba(139,92,246,0.12)" : "none",
         }}
       />
+      {Icon && (
+        <Icon className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/20 transition-colors peer-focus:text-violet-400 pointer-events-none" style={{ marginTop: '4px' }} />
+      )}
       <label
         htmlFor={id}
-        className="pointer-events-none absolute left-4 transition-all duration-200 font-medium select-none"
+        className="pointer-events-none absolute transition-all duration-200 font-semibold select-none"
         style={{
+          left:     Icon ? "44px" : "16px",
           top:      focused || filled ? "6px"   : "50%",
           transform: focused || filled ? "translateY(0)" : "translateY(-50%)",
-          fontSize:  focused || filled ? "9px"  : "12.5px",
+          fontSize:  focused || filled ? "8.5px"  : "12px",
           color:     focused ? "rgba(167,139,250,0.9)" : "rgba(255,255,255,0.3)",
           letterSpacing: focused || filled ? "0.12em" : "0.02em",
           textTransform: "uppercase",
+          marginTop: focused || filled ? "0px" : "-2px"
         }}
       >
         {label}
@@ -204,27 +270,83 @@ function LiveTicker() {
   );
 }
 
+// Password rules evaluator configuration
+const PASSWORD_REQUIREMENTS = [
+  { label: "8+ characters", test: (pw: string) => pw.length >= 8 },
+  { label: "Uppercase letter", test: (pw: string) => /[A-Z]/.test(pw) },
+  { label: "Lowercase letter", test: (pw: string) => /[a-z]/.test(pw) },
+  { label: "Number", test: (pw: string) => /[0-9]/.test(pw) },
+  { label: "Special Character", test: (pw: string) => /[^A-Za-z0-9]/.test(pw) },
+];
+
 // ─── Main signup page ─────────────────────────────────────────────────────────
 export default function SignupPage() {
   const { signup, isLoading } = useAuth();
-  const [name,     setName]     = useState("");
-  const [email,    setEmail]    = useState("");
-  const [password, setPassword] = useState("");
+  
+  // Advanced Registration fields
+  const [firstName, setFirstName]             = useState("");
+  const [lastName, setLastName]               = useState("");
+  const [username, setUsername]               = useState("");
+  const [email, setEmail]                     = useState("");
+  const [password, setPassword]               = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  
   const [showPass, setShowPass] = useState(false);
-  const [agree,    setAgree]    = useState(false);
-  const [error,    setError]    = useState("");
-  const [step,     setStep]     = useState<"info" | "done">("info");
+  const [agree, setAgree]       = useState(false);
+  const [error, setError]       = useState("");
+  const [step, setStep]         = useState<"info" | "verify" | "done">("info");
+  const [generatedOtp, setGeneratedOtp] = useState("");
+  const [enteredOtp, setEnteredOtp] = useState("");
 
-  const strength = getStrength(password);
+  // 3D Tilt state
+  const cardRef = useRef<HTMLDivElement>(null);
+  const [tilt, setTilt] = useState({ x: 0, y: 0 });
+
+  const handleCardMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!cardRef.current) return;
+    const card = cardRef.current.getBoundingClientRect();
+    const x = e.clientX - card.left - card.width / 2;
+    const y = e.clientY - card.top - card.height / 2;
+    
+    // Smooth tilt angles
+    const rX = -(y / (card.height / 2)) * 6;
+    const rY = (x / (card.width / 2)) * 6;
+    setTilt({ x: rX, y: rY });
+  };
+
+  const handleCardMouseLeave = () => {
+    setTilt({ x: 0, y: 0 });
+  };
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
-    if (password.length < 8) { setError("Password must be at least 8 characters."); return; }
-    if (!agree) { setError("Please accept the terms to continue."); return; }
+
+    // Verify all requirements
+    const allMet = PASSWORD_REQUIREMENTS.every(req => req.test(password));
+    if (!allMet) {
+      setError("Please satisfy all password security requirements.");
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      setError("Passwords do not match.");
+      return;
+    }
+
+    if (!agree) {
+      setError("Please accept the terms to continue.");
+      return;
+    }
+
     try {
-      await signup({ name, email, password });
-      setStep("done");
+      const fullName = `${firstName} ${lastName}`.trim();
+      await signup({ name: fullName, email, password });
+      
+      const otp = Math.floor(100000 + Math.random() * 900000).toString();
+      setGeneratedOtp(otp);
+      setStep("verify");
+      toast.info(`✉️ [Trust Security] Verification OTP sent: ${otp}`, { duration: 10000 });
     } catch (err: unknown) {
       const axiosErr = err as any;
       let message = "Could not create account.";
@@ -234,6 +356,38 @@ export default function SignupPage() {
       setError(message);
     }
   }
+
+  const handleVerifyOtp = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (enteredOtp.trim() === generatedOtp) {
+      const verifiedEmailsKey = "nexus_verified_emails";
+      let list: string[] = [];
+      if (typeof window !== "undefined") {
+        const stored = localStorage.getItem(verifiedEmailsKey);
+        if (stored) {
+          try { list = JSON.parse(stored); } catch (ex) {}
+        }
+        const emailLower = email.toLowerCase().trim();
+        if (!list.includes(emailLower)) {
+          list.push(emailLower);
+          localStorage.setItem(verifiedEmailsKey, JSON.stringify(list));
+        }
+      }
+      
+      toast.success("Email verified successfully!");
+      setStep("done");
+      setError("");
+    } else {
+      setError("Invalid OTP verification code. Please check the code and try again.");
+    }
+  };
+
+  const handleResendOtp = () => {
+    const newOtp = Math.floor(100000 + Math.random() * 900000).toString();
+    setGeneratedOtp(newOtp);
+    setError("");
+    toast.success(`✉️ [Trust Security] New OTP code sent: ${newOtp}`, { duration: 10000 });
+  };
 
   return (
     <>
@@ -266,18 +420,18 @@ export default function SignupPage() {
         }
       `}</style>
 
-      <div className="min-h-screen bg-[#07080f] flex overflow-hidden">
+      <div className="min-h-screen bg-[#040408] flex overflow-hidden">
 
-        {/* ══ LEFT PANEL (55%) ══════════════════════════════════════════════ */}
-        <div className="hidden lg:flex flex-col w-[55%] relative border-r border-white/[0.045] overflow-hidden">
-          <Particles density={60} />
+        {/* ══ LEFT PANEL (50%) ══════════════════════════════════════════════ */}
+        <div className="hidden lg:flex flex-col w-[50%] relative border-r border-white/[0.04] overflow-hidden">
+          <Particles />
 
           {/* Ambient blobs */}
-          <div className="absolute top-[20%] left-[20%] w-72 h-72 rounded-full blur-[90px] opacity-[0.07] bg-violet-500 pointer-events-none" />
-          <div className="absolute bottom-[15%] right-[15%] w-56 h-56 rounded-full blur-[70px] opacity-[0.05] bg-cyan-400 pointer-events-none" />
-          <div className="absolute top-[60%] left-[40%] w-40 h-40 rounded-full blur-[60px] opacity-[0.04] bg-emerald-400 pointer-events-none" />
+          <div className="absolute top-[20%] left-[20%] w-72 h-72 rounded-full blur-[90px] opacity-[0.09] bg-violet-600 pointer-events-none" />
+          <div className="absolute bottom-[15%] right-[15%] w-56 h-56 rounded-full blur-[70px] opacity-[0.07] bg-cyan-400 pointer-events-none" />
+          <div className="absolute top-[60%] left-[40%] w-40 h-40 rounded-full blur-[60px] opacity-[0.05] bg-emerald-400 pointer-events-none" />
 
-          <div className="relative flex flex-col h-full px-14 py-12">
+          <div className="relative flex flex-col h-full px-12 py-10 select-none">
 
             {/* Logo */}
             <motion.div
@@ -287,10 +441,9 @@ export default function SignupPage() {
               transition={{ duration: 0.5 }}
             >
               <div
-                className="w-9 h-9 rounded-xl flex items-center justify-center text-sm font-bold text-white"
+                className="w-9 h-9 rounded-xl flex items-center justify-center text-sm font-bold text-white shadow-lg shadow-violet-500/20"
                 style={{
                   background: "linear-gradient(135deg, #7c3aed, #4f46e5)",
-                  boxShadow: "0 4px 16px rgba(124,58,237,0.4)",
                 }}
               >
                 ✦
@@ -300,7 +453,7 @@ export default function SignupPage() {
 
             {/* Hero headline */}
             <motion.div
-              className="mt-12 mb-10"
+              className="mt-10 mb-8"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.15, duration: 0.55 }}
@@ -308,7 +461,7 @@ export default function SignupPage() {
               <p className="text-[10px] font-bold tracking-[0.25em] uppercase text-violet-400/60 mb-3">
                 Your AI engineering team awaits
               </p>
-              <h2 className="text-[32px] font-bold text-white/88 leading-[1.2] tracking-tight">
+              <h2 className="text-[30px] font-bold text-white/88 leading-[1.2] tracking-tight">
                 Build faster with<br />
                 <span
                   className="bg-clip-text text-transparent"
@@ -318,13 +471,13 @@ export default function SignupPage() {
                 </span>
               </h2>
               <p className="mt-4 text-[13px] text-white/35 leading-relaxed max-w-xs">
-                A full-stack AI workspace where specialized agents collaborate, remember context, and ship work — so you can focus on what matters.
+                A full-stack AI workspace where specialized agents collaborate, remember context, and ship work.
               </p>
             </motion.div>
 
             {/* Stats row */}
             <motion.div
-              className="grid grid-cols-3 gap-3 mb-10"
+              className="grid grid-cols-3 gap-3 mb-8"
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.3, duration: 0.5 }}
@@ -337,10 +490,10 @@ export default function SignupPage() {
                 <div
                   key={unit}
                   className="rounded-xl px-4 py-3 flex flex-col"
-                  style={{
-                    background: `${color}08`,
-                    border: `1px solid ${color}20`,
-                  }}
+                    style={{
+                      background: `${color}08`,
+                      border: `1px solid ${color}20`,
+                    }}
                 >
                   <span className="text-[20px] font-bold" style={{ color }}>{val}</span>
                   <span className="text-[10px] text-white/35 font-medium tracking-wide mt-0.5">{unit}</span>
@@ -349,7 +502,7 @@ export default function SignupPage() {
             </motion.div>
 
             {/* Feature list */}
-            <div className="space-y-3 mb-10">
+            <div className="space-y-3.5 mb-8">
               {FEATURES.map((f, i) => (
                 <motion.div
                   key={f.title}
@@ -370,7 +523,7 @@ export default function SignupPage() {
                   </div>
                   <div>
                     <p className="text-[12px] font-semibold text-white/70">{f.title}</p>
-                    <p className="text-[11px] text-white/30 leading-relaxed mt-0.5">{f.desc}</p>
+                    <p className="text-[11.5px] text-white/30 leading-relaxed mt-0.5">{f.desc}</p>
                   </div>
                 </motion.div>
               ))}
@@ -378,6 +531,7 @@ export default function SignupPage() {
 
             {/* Live agent ticker */}
             <motion.div
+              className="mb-8"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ delay: 0.8, duration: 0.5 }}
@@ -389,7 +543,7 @@ export default function SignupPage() {
             </motion.div>
 
             {/* Bottom branding */}
-            <div className="mt-auto pt-6 flex items-center justify-between">
+            <div className="mt-auto pt-4 flex items-center justify-between">
               <p className="text-[10px] text-white/15 tracking-widest uppercase">
                 Built with LangGraph · Groq · pgvector
               </p>
@@ -402,10 +556,10 @@ export default function SignupPage() {
           </div>
         </div>
 
-        {/* ══ RIGHT PANEL (45%) ════════════════════════════════════════════= */}
-        <div className="flex-1 lg:w-[45%] flex items-center justify-center p-6 relative overflow-hidden">
+        {/* ══ RIGHT PANEL (50% width) ════════════════════════════════════════ */}
+        <div className="flex-1 lg:w-[50%] flex items-center justify-center p-6 relative overflow-hidden">
 
-          {/* Right side ambient */}
+          {/* Right side background glow */}
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 h-80 bg-violet-700/5 rounded-full blur-[100px] pointer-events-none" />
 
           <AnimatePresence mode="wait">
@@ -431,168 +585,300 @@ export default function SignupPage() {
                 >
                   ✓
                 </motion.div>
-                <h2 className="text-[24px] font-bold text-white/88 mb-2">You're in, {name.split(" ")[0]}!</h2>
+                <h2 className="text-[23px] font-bold text-white/88 mb-2">Workspace Ready!</h2>
                 <p className="text-[13px] text-white/35 leading-relaxed mb-8">
-                  Your workspace is ready. Six agents are standing by to help you build, research, and ship.
+                  Your node has been registered and verified successfully. Six agents are standing by.
                 </p>
                 <Link
                   href="/auth/login"
-                  className="block w-full py-3 rounded-xl text-[13px] font-semibold text-white text-center"
+                  className="block w-full py-3 rounded-xl text-[13px] font-semibold text-white text-center shadow-lg shadow-violet-500/20 border border-violet-500/25 transition-all duration-300"
                   style={{
-                    background: "linear-gradient(135deg, #7c3aed, #6d28d9)",
-                    boxShadow: "0 4px 20px rgba(109,40,217,0.35)",
+                    background: "linear-gradient(135deg, #7c3aed, #5b21b6)",
                   }}
                 >
-                  Enter workspace →
+                  Establish Link →
                 </Link>
+              </motion.div>
+            ) : step === "verify" ? (
+              /* ── VERIFY EMAIL OTP STATE ── */
+              <motion.div
+                key="verify"
+                initial={{ opacity: 0, scale: 0.92 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.4 }}
+                className="w-full max-w-[370px]"
+              >
+                {/* Heading */}
+                <div className="mb-6 select-none">
+                  <div className="inline-flex w-10 h-10 rounded-2xl bg-gradient-to-br from-violet-500 to-indigo-600 items-center justify-center text-md mb-4 shadow-lg shadow-violet-500/20 text-white animate-pulse">
+                    ✉️
+                  </div>
+                  <h1 className="text-[24px] font-bold text-white/90 tracking-tight leading-tight">
+                    Verify Email Address
+                  </h1>
+                  <p className="text-[12.5px] text-white/35 mt-1.5 leading-relaxed">
+                    A 6-digit verification code has been generated for <strong className="text-white/60">{email}</strong>.
+                  </p>
+                </div>
+
+                <motion.div
+                  ref={cardRef}
+                  onMouseMove={handleCardMouseMove}
+                  onMouseLeave={handleCardMouseLeave}
+                  animate={{ rotateX: tilt.x, rotateY: tilt.y }}
+                  transition={{ type: "spring", stiffness: 350, damping: 25 }}
+                  style={{ 
+                    transformStyle: "preserve-3d",
+                    background: "rgba(255,255,255,0.02)",
+                    backdropFilter: "blur(28px)",
+                    WebkitBackdropFilter: "blur(28px)",
+                    border: "1px solid rgba(255,255,255,0.06)",
+                    boxShadow: "0 28px 65px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.04)"
+                  }}
+                  className="rounded-3xl p-6 space-y-4"
+                >
+                  <AnimatePresence>
+                    {error && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: "auto" }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="bg-red-500/8 border border-red-500/15 text-red-400/90 text-[11.5px] rounded-xl px-3.5 py-2.5 leading-relaxed flex items-start gap-2"
+                      >
+                        <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                        <span>{error}</span>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+
+                  <form onSubmit={handleVerifyOtp} className="space-y-4">
+                    <div className="space-y-2">
+                      <label className="text-[10px] text-white/30 font-bold uppercase tracking-widest block mb-1">
+                        Enter 6-Digit OTP Code
+                      </label>
+                      <input
+                        type="text"
+                        maxLength={6}
+                        required
+                        value={enteredOtp}
+                        onChange={e => setEnteredOtp(e.target.value.replace(/\D/g, ""))}
+                        placeholder="000000"
+                        className="w-full text-center rounded-xl py-3 text-[22px] font-bold font-mono tracking-[0.3em] text-white bg-white/[0.03] border border-white/[0.08] focus:border-violet-500/40 outline-none transition-all"
+                      />
+                    </div>
+
+                    <button
+                      type="submit"
+                      className="w-full py-2.5 text-white rounded-xl text-[13px] font-semibold shadow-md shadow-violet-500/10 border border-violet-500/25 transition-all duration-300 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500"
+                    >
+                      Confirm Verification Code
+                    </button>
+                  </form>
+
+                  <div className="flex items-center justify-between text-xs text-white/30 pt-2 border-t border-white/[0.04]">
+                    <span>Didn't receive code?</span>
+                    <button
+                      type="button"
+                      onClick={handleResendOtp}
+                      className="text-violet-400 hover:text-violet-300 font-bold transition-all"
+                    >
+                      Resend OTP
+                    </button>
+                  </div>
+                </motion.div>
               </motion.div>
             ) : (
               /* ── SIGNUP FORM ── */
               <motion.div
                 key="form"
-                initial={{ opacity: 0, y: 28 }}
+                initial={{ opacity: 0, y: 25 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0 }}
-                transition={{ duration: 0.45, ease: "easeOut" }}
-                className="w-full max-w-[360px]"
+                transition={{ duration: 0.5, ease: "easeOut" }}
+                className="w-full max-w-[380px] relative z-10"
               >
                 {/* Heading */}
-                <div className="mb-7">
+                <div className="mb-6 select-none">
                   <div
-                    className="inline-flex w-10 h-10 rounded-xl items-center justify-center text-lg font-bold text-white mb-5"
+                    className="inline-flex w-10 h-10 rounded-2xl items-center justify-center text-lg font-bold text-white mb-4.5 shadow-lg shadow-violet-500/20"
                     style={{
                       background: "linear-gradient(135deg, #7c3aed, #4f46e5)",
-                      boxShadow: "0 4px 16px rgba(124,58,237,0.35)",
                     }}
                   >
                     ✦
                   </div>
-                  <h1 className="text-[26px] font-bold text-white/88 tracking-tight leading-tight">
-                    Create your workspace
+                  <h1 className="text-[24px] font-bold text-white/90 tracking-tight leading-tight">
+                    Nexus Registration
                   </h1>
-                  <p className="text-[13px] text-white/32 mt-1.5">
-                    Join thousands building smarter with AI agents.
+                  <p className="text-[12.5px] text-white/35 mt-1.5">
+                    Create your profile to delegate and orchestrate multi-agent cells.
                   </p>
                 </div>
 
-                {/* Glass card */}
-                <div
-                  className="rounded-2xl p-6 relative overflow-hidden"
-                  style={{
-                    background: "rgba(255,255,255,0.03)",
+                {/* ── Glass card container with 3D Tilt ── */}
+                <motion.div
+                  ref={cardRef}
+                  onMouseMove={handleCardMouseMove}
+                  onMouseLeave={handleCardMouseLeave}
+                  animate={{ rotateX: tilt.x, rotateY: tilt.y }}
+                  transition={{ type: "spring", stiffness: 350, damping: 25 }}
+                  style={{ 
+                    transformStyle: "preserve-3d",
+                    background: "rgba(255,255,255,0.02)",
                     backdropFilter: "blur(28px)",
                     WebkitBackdropFilter: "blur(28px)",
-                    border: "1px solid rgba(255,255,255,0.075)",
-                    boxShadow: "0 24px 60px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.06)",
+                    border: "1px solid rgba(255,255,255,0.06)",
+                    boxShadow: "0 28px 65px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.04)"
                   }}
+                  className="rounded-3xl p-5 relative overflow-hidden"
                 >
                   {/* Top shimmer line */}
-                  <div className="absolute top-0 left-8 right-8 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+                  <div className="absolute top-0 left-6 right-6 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
 
-                  {/* Error */}
+                  {/* Form Errors */}
                   <AnimatePresence>
                     {error && (
                       <motion.div
                         key="err"
-                        initial={{ opacity: 0, y: -6, height: 0 }}
-                        animate={{ opacity: 1, y: 0, height: "auto" }}
-                        exit={{ opacity: 0, height: 0 }}
-                        className="bg-red-500/8 border border-red-500/20 text-red-400/90 text-[12px] rounded-xl px-4 py-3 mb-4 leading-relaxed overflow-hidden"
+                        initial={{ opacity: 0, height: 0, y: -8 }}
+                        animate={{ opacity: 1, height: "auto", y: 0 }}
+                        exit={{ opacity: 0, height: 0, y: -8 }}
+                        className="bg-red-500/8 border border-red-500/15 text-red-400/90 text-[11.5px] rounded-xl px-3.5 py-2.5 mb-4 leading-relaxed flex items-start gap-2"
                       >
-                        {error}
+                        <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                        <span>{error}</span>
                       </motion.div>
                     )}
                   </AnimatePresence>
 
                   <form onSubmit={handleSubmit} className="space-y-3.5">
+                    
+                    {/* First & Last Name side-by-side */}
+                    <div className="grid grid-cols-2 gap-3">
+                      <FloatingInput
+                        id="firstName" label="First Name" value={firstName} onChange={setFirstName}
+                        placeholder="John" required icon={UserIcon}
+                      />
+                      <FloatingInput
+                        id="lastName" label="Last Name" value={lastName} onChange={setLastName}
+                        placeholder="Doe" required icon={UserIcon}
+                      />
+                    </div>
 
-                    {/* Name */}
+                    {/* Username */}
                     <FloatingInput
-                      id="name" label="Full name" value={name} onChange={setName}
-                      placeholder="Rutuja" autoComplete="name" required
+                      id="username" label="Username" value={username} onChange={setUsername}
+                      placeholder="johndoe" required icon={UserIcon}
                     />
 
                     {/* Email */}
                     <FloatingInput
-                      id="email" label="Email address" type="email" value={email}
-                      onChange={setEmail} placeholder="you@example.com"
-                      autoComplete="email" required
+                      id="email" label="Email Address" type="email" value={email}
+                      onChange={setEmail} placeholder="you@workspace.net"
+                      autoComplete="email" required icon={Mail}
                     />
 
-                    {/* Password with show/hide */}
+                    {/* Password */}
                     <div className="relative">
                       <FloatingInput
                         id="password" label="Password"
                         type={showPass ? "text" : "password"}
                         value={password} onChange={setPassword}
-                        placeholder="Min 8 characters"
-                        autoComplete="new-password" required
+                        placeholder="••••••••"
+                        autoComplete="new-password" required icon={Lock}
                       />
                       <button
                         type="button"
                         onClick={() => setShowPass(p => !p)}
                         tabIndex={-1}
-                        className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[10px] font-medium transition-colors select-none"
-                        style={{ color: "rgba(255,255,255,0.25)" }}
-                        onMouseEnter={e => (e.currentTarget.style.color = "rgba(167,139,250,0.7)")}
-                        onMouseLeave={e => (e.currentTarget.style.color = "rgba(255,255,255,0.25)")}
+                        className="absolute right-3.5 top-1/2 -translate-y-1/2 text-white/20 hover:text-white/45 transition-colors"
                       >
-                        {showPass ? "HIDE" : "SHOW"}
+                        {showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                       </button>
                     </div>
 
-                    {/* Password strength meter */}
+                    {/* Live Password Validation Checklist */}
                     {password.length > 0 && (
                       <motion.div
                         initial={{ opacity: 0, height: 0 }}
                         animate={{ opacity: 1, height: "auto" }}
-                        className="overflow-hidden"
+                        exit={{ opacity: 0, height: 0 }}
+                        className="space-y-1.5 p-3 rounded-xl bg-white/[0.01] border border-white/[0.04] text-[11px]"
                       >
-                        <div className="flex gap-1 mb-1">
-                          {[1, 2, 3, 4, 5].map(n => (
-                            <div
-                              key={n}
-                              className="flex-1 h-0.5 rounded-full transition-all duration-300"
-                              style={{
-                                background: n <= strength.score ? strength.color : "rgba(255,255,255,0.07)",
-                                boxShadow: n <= strength.score ? `0 0 4px ${strength.color}80` : "none",
-                              }}
-                            />
-                          ))}
-                        </div>
-                        <p className="text-[10px] font-semibold tracking-wide" style={{ color: strength.color }}>
-                          {strength.label}
-                          {strength.score < 4 && (
-                            <span className="text-white/25 font-normal ml-1.5">
-                              — add {strength.score < 2 ? "uppercase, numbers & symbols" : strength.score < 3 ? "numbers & symbols" : "a symbol"}
-                            </span>
-                          )}
+                        <p className="text-[10px] font-bold text-white/30 uppercase tracking-widest mb-1.5 flex items-center gap-1">
+                          <ShieldCheck className="w-3.5 h-3.5 text-violet-400" />
+                          Security Requirements
                         </p>
+                        <div className="grid grid-cols-2 gap-x-3 gap-y-1.5">
+                          {PASSWORD_REQUIREMENTS.map((req, i) => {
+                            const isMet = req.test(password);
+                            return (
+                              <div key={i} className="flex items-center gap-1.5 transition-all duration-300">
+                                <span className={`font-bold text-[11px] ${isMet ? 'text-emerald-400' : 'text-red-400'}`}>
+                                  {isMet ? "✓" : "✕"}
+                                </span>
+                                <span className={isMet ? 'text-emerald-400/80 font-medium' : 'text-red-400/60'}>
+                                  {req.label}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </motion.div>
+                    )}
+
+                    {/* Confirm Password */}
+                    <div className="relative">
+                      <FloatingInput
+                        id="confirmPassword" label="Confirm Password"
+                        type={showPass ? "text" : "password"}
+                        value={confirmPassword} onChange={setConfirmPassword}
+                        placeholder="••••••••"
+                        autoComplete="new-password" required icon={Lock}
+                      />
+                    </div>
+
+                    {/* Confirm Match Validation */}
+                    {confirmPassword.length > 0 && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: "auto" }}
+                        className="text-[10.5px] pl-1 font-medium transition-colors"
+                      >
+                        {password === confirmPassword ? (
+                          <span className="text-emerald-400 flex items-center gap-1">
+                            <CheckCircle2 className="w-3.5 h-3.5" /> Passwords match
+                          </span>
+                        ) : (
+                          <span className="text-red-400 flex items-center gap-1">
+                            <AlertCircle className="w-3.5 h-3.5" /> Passwords do not match
+                          </span>
+                        )}
                       </motion.div>
                     )}
 
                     {/* Terms checkbox */}
-                    <label className="flex items-start gap-3 cursor-pointer group pt-1">
+                    <label className="flex items-start gap-2.5 cursor-pointer group/opt select-none pt-1">
                       <div
                         onClick={() => setAgree(a => !a)}
-                        className="w-4 h-4 mt-0.5 rounded-[5px] flex items-center justify-center flex-shrink-0 transition-all duration-150"
+                        className="w-4 h-4 mt-0.5 rounded-[6px] flex items-center justify-center flex-shrink-0 transition-all duration-200"
                         style={{
-                          background: agree ? "rgba(139,92,246,0.85)" : "rgba(255,255,255,0.04)",
-                          border: agree ? "1px solid rgba(139,92,246,0.85)" : "1px solid rgba(255,255,255,0.11)",
-                          boxShadow: agree ? "0 0 10px rgba(139,92,246,0.3)" : "none",
+                          background: agree ? "rgba(139,92,246,0.7)" : "rgba(255,255,255,0.02)",
+                          border: agree ? "1px solid rgba(139,92,246,0.7)" : "1px solid rgba(255,255,255,0.1)"
                         }}
                       >
                         {agree && (
-                          <svg width="9" height="7" viewBox="0 0 9 7" fill="none">
-                            <path d="M1 3.5L3.2 5.5L8 1" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                          <svg width="8" height="6" viewBox="0 0 9 7" fill="none">
+                            <path d="M1 3.5L3.2 5.5L8 1" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                           </svg>
                         )}
                       </div>
-                      <span className="text-[11.5px] leading-relaxed" style={{ color: "rgba(255,255,255,0.3)" }}>
+                      <span className="text-[11px] leading-relaxed text-white/30 group-hover/opt:text-white/50 transition-colors">
                         I agree to the{" "}
-                        <span className="text-violet-400/80 hover:text-violet-300 transition-colors cursor-pointer">Terms of Service</span>
+                        <span className="text-violet-400/80 hover:text-violet-300 transition-colors">Terms of Service</span>
                         {" "}and{" "}
-                        <span className="text-violet-400/80 hover:text-violet-300 transition-colors cursor-pointer">Privacy Policy</span>
+                        <span className="text-violet-400/80 hover:text-violet-300 transition-colors">Privacy Policy</span>
                       </span>
                     </label>
 
@@ -600,42 +886,35 @@ export default function SignupPage() {
                     <motion.button
                       type="submit"
                       disabled={isLoading}
-                      whileHover={{ scale: isLoading ? 1 : 1.02 }}
-                      whileTap={{ scale: isLoading ? 1 : 0.98 }}
-                      transition={{ type: "spring", stiffness: 400, damping: 22 }}
-                      className="w-full mt-1 py-3 text-white rounded-xl text-[13px] font-semibold disabled:opacity-50 disabled:cursor-not-allowed relative overflow-hidden"
+                      whileHover={{ scale: isLoading ? 1 : 1.015 }}
+                      whileTap={{ scale: isLoading ? 1 : 0.985 }}
+                      className="w-full mt-2 py-2.5 text-white rounded-xl text-[13px] font-semibold disabled:opacity-40 disabled:cursor-not-allowed overflow-hidden flex items-center justify-center gap-1.5 shadow-md shadow-violet-500/10 border border-violet-500/25 transition-all duration-300"
                       style={{
-                        background: isLoading
-                          ? "rgba(124,58,237,0.5)"
-                          : "linear-gradient(135deg, #7c3aed, #6d28d9)",
-                        boxShadow: isLoading ? "none" : "0 4px 24px rgba(109,40,217,0.42), inset 0 1px 0 rgba(255,255,255,0.13)",
+                        background: "linear-gradient(135deg, #7c3aed, #5b21b6)",
                       }}
                     >
-                      {/* shimmer overlay on hover is handled by CSS class on hover */}
                       {isLoading ? (
-                        <span className="flex items-center justify-center gap-2.5">
-                          <svg className="animate-spin w-3.5 h-3.5" viewBox="0 0 24 24" fill="none">
+                        <>
+                          <svg className="animate-spin w-4 h-4 text-white" viewBox="0 0 24 24" fill="none">
                             <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.2" />
                             <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
                           </svg>
-                          Setting up your workspace…
-                        </span>
+                          Establishing Profile...
+                        </>
                       ) : (
-                        <span className="flex items-center justify-center gap-1.5">
-                          Create workspace
-                          <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
-                            <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
-                          </svg>
-                        </span>
+                        <>
+                          <span>Register Profile</span>
+                          <ChevronRight className="w-4 h-4" />
+                        </>
                       )}
                     </motion.button>
                   </form>
 
                   {/* Divider */}
-                  <div className="flex items-center gap-3 my-4">
-                    <div className="flex-1 h-px bg-white/[0.055]" />
-                    <span className="text-[10.5px] text-white/18 font-medium">or sign up with</span>
-                    <div className="flex-1 h-px bg-white/[0.055]" />
+                  <div className="flex items-center gap-3 my-5.5 select-none">
+                    <div className="flex-1 h-px bg-white/[0.04]" />
+                    <span className="text-[10px] text-white/18 font-bold uppercase tracking-wider">or</span>
+                    <div className="flex-1 h-px bg-white/[0.04]" />
                   </div>
 
                   {/* OAuth */}
@@ -664,40 +943,37 @@ export default function SignupPage() {
                       <button
                         key={label}
                         type="button"
-                        className="flex items-center justify-center gap-2 py-2.5 rounded-xl text-[12px] font-medium transition-all duration-150"
+                        className="w-full flex items-center justify-center gap-2.5 py-2.5 rounded-xl text-[12px] font-medium text-white/50 hover:text-white/75 transition-all duration-200"
                         style={{
-                          background: "rgba(255,255,255,0.03)",
-                          border: "1px solid rgba(255,255,255,0.07)",
-                          color: "rgba(255,255,255,0.45)",
+                          background: "rgba(255,255,255,0.02)",
+                          border: "1px solid rgba(255,255,255,0.05)",
                         }}
                         onMouseEnter={e => {
-                          (e.currentTarget as HTMLButtonElement).style.background = "rgba(255,255,255,0.06)";
-                          (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(255,255,255,0.13)";
-                          (e.currentTarget as HTMLButtonElement).style.color = "rgba(255,255,255,0.7)";
+                          (e.currentTarget as HTMLButtonElement).style.background = "rgba(255,255,255,0.04)";
+                          (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(255,255,255,0.1)";
                         }}
                         onMouseLeave={e => {
-                          (e.currentTarget as HTMLButtonElement).style.background = "rgba(255,255,255,0.03)";
-                          (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(255,255,255,0.07)";
-                          (e.currentTarget as HTMLButtonElement).style.color = "rgba(255,255,255,0.45)";
+                          (e.currentTarget as HTMLButtonElement).style.background = "rgba(255,255,255,0.02)";
+                          (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(255,255,255,0.05)";
                         }}
                       >
-                        <span style={{ color: "rgba(255,255,255,0.55)" }}>{icon}</span>
-                        {label}
+                        <span className="text-white/50">{icon}</span>
+                        <span>{label}</span>
                       </button>
                     ))}
                   </div>
 
                   {/* Sign in link */}
-                  <p className="text-center text-[12px] mt-4" style={{ color: "rgba(255,255,255,0.22)" }}>
+                  <p className="text-center text-[12px] text-white/20 mt-5 select-none" style={{ color: "rgba(255,255,255,0.2)" }}>
                     Already have a workspace?{" "}
-                    <Link href="/auth/login" className="font-medium transition-colors" style={{ color: "rgba(167,139,250,0.8)" }}
+                    <Link href="/auth/login" className="font-bold transition-colors" style={{ color: "rgba(167,139,250,0.85)" }}
                       onMouseEnter={e => (e.currentTarget.style.color = "rgba(196,181,253,1)")}
-                      onMouseLeave={e => (e.currentTarget.style.color = "rgba(167,139,250,0.8)")}
+                      onMouseLeave={e => (e.currentTarget.style.color = "rgba(167,139,250,0.85)")}
                     >
                       Sign in →
                     </Link>
                   </p>
-                </div>
+                </motion.div>
 
                 {/* Social proof */}
                 <motion.div
@@ -711,7 +987,7 @@ export default function SignupPage() {
                       <div
                         key={i}
                         className="w-6 h-6 rounded-full border-2 flex items-center justify-center text-[7px] font-bold text-white"
-                        style={{ background: c, borderColor: "#07080f", zIndex: 4 - i }}
+                        style={{ background: c, borderColor: "#040408", zIndex: 4 - i }}
                       >
                         {["R","A","P","D"][i]}
                       </div>

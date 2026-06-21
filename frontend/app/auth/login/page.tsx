@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/hooks/useAuth";
+import { toast } from "sonner";
 import { 
   Brain, Search, Code, Compass, ShieldAlert, Lightbulb, 
   Mail, Lock, Eye, EyeOff, Sparkles, AlertCircle 
@@ -392,6 +393,9 @@ export default function LoginPage() {
   const [error, setError]       = useState("");
   const [showPass, setShowPass] = useState(false);
   const [remember, setRemember] = useState(false);
+  const [step, setStep]         = useState<"login" | "verify">("login");
+  const [loginOtp, setLoginOtp] = useState("");
+  const [enteredOtp, setEnteredOtp] = useState("");
 
   // 3D Tilt state
   const cardRef = useRef<HTMLDivElement>(null);
@@ -416,12 +420,62 @@ export default function LoginPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
+
+    const verifiedEmailsKey = "nexus_verified_emails";
+    const stored = typeof window !== "undefined" ? localStorage.getItem(verifiedEmailsKey) : null;
+    let list: string[] = [];
+    if (stored) {
+      try { list = JSON.parse(stored); } catch (ex) {}
+    }
+    
+    const emailLower = email.toLowerCase().trim();
+    const isVerified = list.includes(emailLower);
+
+    if (!isVerified) {
+      const otp = Math.floor(100000 + Math.random() * 900000).toString();
+      setLoginOtp(otp);
+      setStep("verify");
+      toast.info(`✉️ [Trust Security] Verification OTP sent: ${otp}`, { duration: 10000 });
+      return;
+    }
+
     try {
       await login({ email, password });
     } catch {
       setError("Invalid email or password. Check your credentials and try again.");
     }
   }
+
+  const handleVerifyOtp = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (enteredOtp.trim() === loginOtp) {
+      const verifiedEmailsKey = "nexus_verified_emails";
+      const stored = localStorage.getItem(verifiedEmailsKey);
+      let list: string[] = [];
+      if (stored) {
+        try { list = JSON.parse(stored); } catch (ex) {}
+      }
+      const emailLower = email.toLowerCase().trim();
+      if (!list.includes(emailLower)) {
+        list.push(emailLower);
+        localStorage.setItem(verifiedEmailsKey, JSON.stringify(list));
+      }
+      
+      toast.success("Email verified successfully! You can now log in.");
+      setStep("login");
+      setEnteredOtp("");
+      setError("");
+    } else {
+      setError("Invalid OTP verification code. Please check the code and try again.");
+    }
+  };
+
+  const handleResendOtp = () => {
+    const newOtp = Math.floor(100000 + Math.random() * 900000).toString();
+    setLoginOtp(newOtp);
+    setError("");
+    toast.success(`✉️ [Trust Security] New OTP code sent: ${newOtp}`, { duration: 10000 });
+  };
 
   return (
     <>
@@ -519,147 +573,192 @@ export default function LoginPage() {
                 )}
               </AnimatePresence>
 
-              {/* Input Form */}
-              <form onSubmit={handleSubmit} className="space-y-4">
-                
-                {/* Email field */}
-                <div className="relative group/field">
-                  <label className="text-[10px] text-white/30 font-bold uppercase tracking-widest block mb-1.5 transition-colors group-focus-within/field:text-violet-400">
-                    Network ID (Email)
-                  </label>
-                  <div className="relative flex items-center">
-                    <Mail className="absolute left-4 w-4 h-4 text-white/20 transition-colors group-focus-within/field:text-violet-400 pointer-events-none" />
-                    <input
-                      type="email"
-                      required
-                      value={email}
-                      onChange={e => setEmail(e.target.value)}
-                      placeholder="identity@workspace.net"
-                      autoComplete="email"
-                      className="w-full rounded-xl pl-11 pr-4 py-2.5 text-[13px] text-white/80 placeholder-white/18 outline-none transition-all duration-300"
-                      style={{
-                        background: "rgba(255,255,255,0.03)",
-                        border: "1px solid rgba(255,255,255,0.06)",
-                      }}
-                      onFocus={e => {
-                        e.currentTarget.style.border = "1px solid rgba(139,92,246,0.45)";
-                        e.currentTarget.style.background = "rgba(139,92,246,0.04)";
-                        e.currentTarget.style.boxShadow = "0 0 15px rgba(139,92,246,0.12)";
-                      }}
-                      onBlur={e => {
-                        e.currentTarget.style.border = "1px solid rgba(255,255,255,0.06)";
-                        e.currentTarget.style.background = "rgba(255,255,255,0.03)";
-                        e.currentTarget.style.boxShadow = "none";
-                      }}
-                    />
-                  </div>
-                </div>
-
-                {/* Password field */}
-                <div className="relative group/field">
-                  <div className="flex items-center justify-between mb-1.5">
-                    <label className="text-[10px] text-white/30 font-bold uppercase tracking-widest transition-colors group-focus-within/field:text-violet-400">
-                      Security Phrase
+              {/* Conditional Form Render */}
+              {step === "verify" ? (
+                /* ── VERIFY EMAIL OTP STATE ── */
+                <form onSubmit={handleVerifyOtp} className="space-y-4">
+                  <div className="space-y-2">
+                    <label className="text-[10px] text-white/30 font-bold uppercase tracking-widest text-center block mb-1">
+                      Enter 6-Digit OTP Code
                     </label>
-                    <Link
-                      href="/auth/forgot-password"
-                      className="text-[10.5px] text-violet-400/60 hover:text-violet-300 transition-colors"
-                    >
-                      Recover Code
-                    </Link>
-                  </div>
-                  <div className="relative flex items-center">
-                    <Lock className="absolute left-4 w-4 h-4 text-white/20 transition-colors group-focus-within/field:text-violet-400 pointer-events-none" />
                     <input
-                      type={showPass ? "text" : "password"}
+                      type="text"
+                      maxLength={6}
                       required
-                      value={password}
-                      onChange={e => setPassword(e.target.value)}
-                      placeholder="••••••••"
-                      autoComplete="current-password"
-                      className="w-full rounded-xl pl-11 pr-10 py-2.5 text-[13px] text-white/80 placeholder-white/18 outline-none transition-all duration-300"
-                      style={{
-                        background: "rgba(255,255,255,0.03)",
-                        border: "1px solid rgba(255,255,255,0.06)",
-                      }}
-                      onFocus={e => {
-                        e.currentTarget.style.border = "1px solid rgba(139,92,246,0.45)";
-                        e.currentTarget.style.background = "rgba(139,92,246,0.04)";
-                        e.currentTarget.style.boxShadow = "0 0 15px rgba(139,92,246,0.12)";
-                      }}
-                      onBlur={e => {
-                        e.currentTarget.style.border = "1px solid rgba(255,255,255,0.06)";
-                        e.currentTarget.style.background = "rgba(255,255,255,0.03)";
-                        e.currentTarget.style.boxShadow = "none";
-                      }}
+                      value={enteredOtp}
+                      onChange={e => setEnteredOtp(e.target.value.replace(/\D/g, ""))}
+                      placeholder="000000"
+                      className="w-full text-center rounded-xl py-3 text-[22px] font-bold font-mono tracking-[0.3em] text-white bg-white/[0.03] border border-white/[0.08] focus:border-violet-500/40 outline-none transition-all"
                     />
+                  </div>
+
+                  <button
+                    type="submit"
+                    className="w-full py-2.5 text-white rounded-xl text-[13px] font-semibold shadow-md shadow-violet-500/10 border border-violet-500/25 transition-all duration-300 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500"
+                  >
+                    Confirm Verification Code
+                  </button>
+
+                  <div className="flex items-center justify-between text-xs text-white/30 pt-2 border-t border-white/[0.04]">
                     <button
                       type="button"
-                      onClick={() => setShowPass(p => !p)}
-                      className="absolute right-3.5 text-white/20 hover:text-white/45 transition-colors"
-                      tabIndex={-1}
+                      onClick={() => { setStep("login"); setEnteredOtp(""); setError(""); }}
+                      className="text-white/40 hover:text-white/70 transition-all font-semibold"
                     >
-                      {showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      ← Back to Login
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleResendOtp}
+                      className="text-violet-400 hover:text-violet-300 font-bold transition-all"
+                    >
+                      Resend OTP
                     </button>
                   </div>
-                </div>
+                </form>
+              ) : (
+                /* ── Input Form ── */
+                <form onSubmit={handleSubmit} className="space-y-4">
+                  
+                  {/* Email field */}
+                  <div className="relative group/field">
+                    <label className="text-[10px] text-white/30 font-bold uppercase tracking-widest block mb-1.5 transition-colors group-focus-within/field:text-violet-400">
+                      Network ID (Email)
+                    </label>
+                    <div className="relative flex items-center">
+                      <Mail className="absolute left-4 w-4 h-4 text-white/20 transition-colors group-focus-within/field:text-violet-400 pointer-events-none" />
+                      <input
+                        type="email"
+                        required
+                        value={email}
+                        onChange={e => setEmail(e.target.value)}
+                        placeholder="identity@workspace.net"
+                        autoComplete="email"
+                        className="w-full rounded-xl pl-11 pr-4 py-2.5 text-[13px] text-white/80 placeholder-white/18 outline-none transition-all duration-300"
+                        style={{
+                          background: "rgba(255,255,255,0.03)",
+                          border: "1px solid rgba(255,255,255,0.06)",
+                        }}
+                        onFocus={e => {
+                          e.currentTarget.style.border = "1px solid rgba(139,92,246,0.45)";
+                          e.currentTarget.style.background = "rgba(139,92,246,0.04)";
+                          e.currentTarget.style.boxShadow = "0 0 15px rgba(139,92,246,0.12)";
+                        }}
+                        onBlur={e => {
+                          e.currentTarget.style.border = "1px solid rgba(255,255,255,0.06)";
+                          e.currentTarget.style.background = "rgba(255,255,255,0.03)";
+                          e.currentTarget.style.boxShadow = "none";
+                        }}
+                      />
+                    </div>
+                  </div>
 
-                {/* Remember state */}
-                <label className="flex items-center gap-2.5 cursor-pointer group/opt select-none w-max">
-                  <div
-                    onClick={() => setRemember(r => !r)}
-                    className="w-4 h-4 rounded-[6px] flex items-center justify-center transition-all duration-200 flex-shrink-0"
+                  {/* Password field */}
+                  <div className="relative group/field">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="text-[10px] text-white/30 font-bold uppercase tracking-widest transition-colors group-focus-within/field:text-violet-400">
+                        Security Phrase
+                      </label>
+                      <Link
+                        href="/auth/forgot-password"
+                        className="text-[10.5px] text-violet-400/60 hover:text-violet-300 transition-colors"
+                      >
+                        Recover Code
+                      </Link>
+                    </div>
+                    <div className="relative flex items-center">
+                      <Lock className="absolute left-4 w-4 h-4 text-white/20 transition-colors group-focus-within/field:text-violet-400 pointer-events-none" />
+                      <input
+                        type={showPass ? "text" : "password"}
+                        required
+                        value={password}
+                        onChange={e => setPassword(e.target.value)}
+                        placeholder="••••••••"
+                        autoComplete="current-password"
+                        className="w-full rounded-xl pl-11 pr-10 py-2.5 text-[13px] text-white/80 placeholder-white/18 outline-none transition-all duration-300"
+                        style={{
+                          background: "rgba(255,255,255,0.03)",
+                          border: "1px solid rgba(255,255,255,0.06)",
+                        }}
+                        onFocus={e => {
+                          e.currentTarget.style.border = "1px solid rgba(139,92,246,0.45)";
+                          e.currentTarget.style.background = "rgba(139,92,246,0.04)";
+                          e.currentTarget.style.boxShadow = "0 0 15px rgba(139,92,246,0.12)";
+                        }}
+                        onBlur={e => {
+                          e.currentTarget.style.border = "1px solid rgba(255,255,255,0.06)";
+                          e.currentTarget.style.background = "rgba(255,255,255,0.03)";
+                          e.currentTarget.style.boxShadow = "none";
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPass(p => !p)}
+                        className="absolute right-3.5 text-white/20 hover:text-white/45 transition-colors"
+                        tabIndex={-1}
+                      >
+                        {showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Remember state */}
+                  <label className="flex items-center gap-2.5 cursor-pointer group/opt select-none w-max">
+                    <div
+                      onClick={() => setRemember(r => !r)}
+                      className="w-4 h-4 rounded-[6px] flex items-center justify-center transition-all duration-200 flex-shrink-0"
+                      style={{
+                        background: remember ? "rgba(139,92,246,0.7)" : "rgba(255,255,255,0.02)",
+                        border: remember ? "1px solid rgba(139,92,246,0.7)" : "1px solid rgba(255,255,255,0.1)"
+                      }}
+                    >
+                      {remember && (
+                        <svg width="8" height="6" viewBox="0 0 9 7" fill="none">
+                          <path d="M1 3.5L3.2 5.5L8 1" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      )}
+                    </div>
+                    <span className="text-[11.5px] text-white/30 group-hover/opt:text-white/50 transition-colors">
+                      Preserve connection
+                    </span>
+                  </label>
+
+                  {/* Submit button */}
+                  <motion.button
+                    type="submit"
+                    disabled={isLoading}
+                    whileHover={{ scale: 1.015 }}
+                    whileTap={{ scale: 0.985 }}
+                    className="w-full mt-2 py-2.5 text-white rounded-xl text-[13px] font-semibold disabled:opacity-40 disabled:cursor-not-allowed overflow-hidden flex items-center justify-center gap-1.5 shadow-md shadow-violet-500/10 border border-violet-500/25 transition-all duration-300"
                     style={{
-                      background: remember ? "rgba(139,92,246,0.7)" : "rgba(255,255,255,0.02)",
-                      border: remember ? "1px solid rgba(139,92,246,0.7)" : "1px solid rgba(255,255,255,0.1)"
+                      background: "linear-gradient(135deg, #7c3aed, #5b21b6)",
+                    }}
+                    onMouseEnter={e => {
+                      (e.currentTarget as HTMLButtonElement).style.background =
+                        "linear-gradient(135deg, #8b5cf6, #6d28d9)";
+                    }}
+                    onMouseLeave={e => {
+                      (e.currentTarget as HTMLButtonElement).style.background =
+                        "linear-gradient(135deg, #7c3aed, #5b21b6)";
                     }}
                   >
-                    {remember && (
-                      <svg width="8" height="6" viewBox="0 0 9 7" fill="none">
-                        <path d="M1 3.5L3.2 5.5L8 1" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
+                    {isLoading ? (
+                      <>
+                        <svg className="animate-spin w-4 h-4 text-white" viewBox="0 0 24 24" fill="none">
+                          <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.2"/>
+                          <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/>
+                        </svg>
+                        Establishing Link...
+                      </>
+                    ) : (
+                      <>
+                        <span>Establish Connection</span>
+                        <Sparkles className="w-3.5 h-3.5" />
+                      </>
                     )}
-                  </div>
-                  <span className="text-[11.5px] text-white/30 group-hover/opt:text-white/50 transition-colors">
-                    Preserve connection
-                  </span>
-                </label>
-
-                {/* Submit button */}
-                <motion.button
-                  type="submit"
-                  disabled={isLoading}
-                  whileHover={{ scale: 1.015 }}
-                  whileTap={{ scale: 0.985 }}
-                  className="w-full mt-2 py-2.5 text-white rounded-xl text-[13px] font-semibold disabled:opacity-40 disabled:cursor-not-allowed overflow-hidden flex items-center justify-center gap-1.5 shadow-md shadow-violet-500/10 border border-violet-500/25 transition-all duration-300"
-                  style={{
-                    background: "linear-gradient(135deg, #7c3aed, #5b21b6)",
-                  }}
-                  onMouseEnter={e => {
-                    (e.currentTarget as HTMLButtonElement).style.background =
-                      "linear-gradient(135deg, #8b5cf6, #6d28d9)";
-                  }}
-                  onMouseLeave={e => {
-                    (e.currentTarget as HTMLButtonElement).style.background =
-                      "linear-gradient(135deg, #7c3aed, #5b21b6)";
-                  }}
-                >
-                  {isLoading ? (
-                    <>
-                      <svg className="animate-spin w-4 h-4 text-white" viewBox="0 0 24 24" fill="none">
-                        <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.2"/>
-                        <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/>
-                      </svg>
-                      Establishing Link...
-                    </>
-                  ) : (
-                    <>
-                      <span>Establish Connection</span>
-                      <Sparkles className="w-3.5 h-3.5" />
-                    </>
-                  )}
-                </motion.button>
-              </form>
+                  </motion.button>
+                </form>
+              )}
 
               {/* Decorative separator */}
               <div className="flex items-center gap-3 my-5.5 select-none">

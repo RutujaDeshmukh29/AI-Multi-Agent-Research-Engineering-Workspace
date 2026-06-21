@@ -61,6 +61,35 @@ export interface User {
   name: string;
   avatar_url?: string;
   created_at?: string;
+  first_name?: string;
+  last_name?: string;
+  username?: string;
+  bio?: string;
+  location?: string;
+  github?: string;
+  linkedin?: string;
+  is_verified?: boolean;
+  github_username?: string;
+  github_connected?: boolean;
+  github_repos?: string[];
+  preferences?: {
+    theme?: "dark" | "light" | "system";
+    default_agent?: string;
+    notifications_enabled?: boolean;
+    voice_enabled?: boolean;
+    first_name?: string;
+    last_name?: string;
+    username?: string;
+    bio?: string;
+    location?: string;
+    github?: string;
+    linkedin?: string;
+    avatar_url?: string;
+    github_connected?: boolean;
+    github_username?: string;
+    github_repos?: string[];
+    [key: string]: any;
+  };
 }
 
 export interface AuthTokens {

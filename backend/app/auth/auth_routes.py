@@ -16,6 +16,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel, EmailStr
+from typing import Optional
 import structlog
 
 from app.database.db import get_db
@@ -62,6 +63,7 @@ class UserResponse(BaseModel):
     name: str
     email: str
     created_at: str
+    preferences: Optional[dict] = None
 
     class Config:
         from_attributes = True
@@ -175,4 +177,5 @@ async def get_me(current_user: User = Depends(get_current_user)):
         name=current_user.name,
         email=current_user.email,
         created_at=str(current_user.created_at),
+        preferences=current_user.preferences or {},
     )

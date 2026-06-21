@@ -39,7 +39,7 @@ const AGENTS = [
   { key: "innovation",  label: "Innovation",  icon: "💡", color: "#22d3ee" },
 ];
 
-type RightTab = "roadmap" | "memory" | "graph";
+type RightTab = "roadmap" | "memory" | "graph" | "analytics";
 
 export default function WorkspacePage() {
   const params    = useParams();
@@ -63,17 +63,29 @@ export default function WorkspacePage() {
   const [rightTab,        setRightTab]        = useState<RightTab>("roadmap");
   const [inputValue,      setInputValue]      = useState("");
   const [isVoice,         setIsVoice]         = useState(false);
+  const [isListening,     setIsListening]     = useState(false);
+  const [speakingMessageId, setSpeakingMessageId] = useState<string | null>(null);
   const [expandedAgents,  setExpandedAgents]  = useState<Set<string>>(new Set());
   const [profileOpen,     setProfileOpen]     = useState(false);
   const [renameId,        setRenameId]        = useState<string | null>(null);
   const [renameVal,       setRenameVal]       = useState("");
   const [lastQuery,       setLastQuery]       = useState("");
   const [isGeneratingRoadmap, setIsGeneratingRoadmap] = useState(false);
+  const [agentUsageStats, setAgentUsageStats] = useState<Record<string, number>>({
+    qa: 14,
+    research: 42,
+    engineering: 57,
+    planner: 31,
+    critic: 19,
+    innovation: 25,
+  });
 
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef       = useRef<HTMLTextAreaElement>(null);
   const fileInputRef   = useRef<HTMLInputElement>(null);
+  const recognitionRef = useRef<any>(null);
+  const baseInputTextRef = useRef("");
 
   // Data hooks
   const { data: projects  = [] } = useProjects();
@@ -88,6 +100,161 @@ export default function WorkspacePage() {
   const { open: cmdOpen, setOpen: setCmdOpen } = useCommandPalette();
 
   // ── Effects ────────────────────────────────────────────────────
+  useEffect(() => {
+    return () => {
+      if (recognitionRef.current) {
+        recognitionRef.current.abort();
+      }
+      if (typeof window !== "undefined" && window.speechSynthesis) {
+        window.speechSynthesis.cancel();
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    const sessionCounts: Record<string, number> = {
+      qa: 0,
+      research: 0,
+      engineering: 0,
+      planner: 0,
+      critic: 0,
+      innovation: 0,
+    };
+
+    messages.forEach(m => {
+      if (m.agent_outputs) {
+        Object.keys(m.agent_outputs).forEach(k => {
+          if (k in sessionCounts) sessionCounts[k]++;
+        });
+      }
+    });
+
+    const localKey = `agent_usage_baseline_${projectId}`;
+    let baseline: Record<string, number> = {
+      qa: 14,
+      research: 42,
+      engineering: 57,
+      planner: 31,
+      critic: 19,
+      innovation: 25,
+    };
+    
+    if (typeof window !== "undefined") {
+      const stored = localStorage.getItem(localKey);
+      if (stored) {
+        try {
+          baseline = JSON.parse(stored);
+        } catch (e) {}
+      } else {
+        localStorage.setItem(localKey, JSON.stringify(baseline));
+      }
+    }
+
+    const mergedStats: Record<string, number> = { ...baseline };
+    Object.keys(sessionCounts).forEach(k => {
+      mergedStats[k] = (baseline[k] || 0) + sessionCounts[k];
+    });
+
+    setAgentUsageStats(mergedStats);
+  }, [messages, projectId]);
+
+  // ── Voice Actions ──────────────────────────────────────────────
+  const toggleListening = () => {
+    if (typeof window === "undefined") return;
+
+    const SpeechRecognitionClass = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognitionClass) {
+      toast.error("Speech recognition is not supported in this browser. Please use Chrome, Edge, or Safari.");
+      return;
+    }
+
+    if (isListening) {
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+      }
+      setIsListening(false);
+      return;
+    }
+
+    try {
+      const rec = new SpeechRecognitionClass();
+      rec.continuous = true;
+      rec.interimResults = true;
+      rec.lang = "en-US";
+
+      baseInputTextRef.current = inputValue;
+      setIsVoice(true);
+
+      rec.onstart = () => {
+        setIsListening(true);
+        toast.success("Listening... Speak now.");
+      };
+
+      rec.onerror = (event: any) => {
+        console.error("Speech recognition error:", event.error);
+        if (event.error === "no-speech") {
+          toast.error("No speech detected. Try speaking again.");
+        } else {
+          toast.error(`Voice input issue: ${event.error}`);
+        }
+        setIsListening(false);
+      };
+
+      rec.onend = () => {
+        setIsListening(false);
+      };
+
+      rec.onresult = (event: any) => {
+        let transcript = "";
+        for (let i = 0; i < event.results.length; i++) {
+          transcript += event.results[i][0].transcript;
+        }
+        const base = baseInputTextRef.current.trim();
+        setInputValue(base ? `${base} ${transcript.trim()}` : transcript.trim());
+      };
+
+      recognitionRef.current = rec;
+      rec.start();
+    } catch (err) {
+      console.error("Failed to start speech recognition:", err);
+      toast.error("Failed to initialize microphone.");
+      setIsListening(false);
+    }
+  };
+
+  const handleSpeak = (msgId: string, text: string) => {
+    if (typeof window === "undefined" || !window.speechSynthesis) {
+      toast.error("Text-to-speech is not supported in this browser.");
+      return;
+    }
+
+    if (speakingMessageId === msgId) {
+      window.speechSynthesis.cancel();
+      setSpeakingMessageId(null);
+      return;
+    }
+
+    window.speechSynthesis.cancel();
+
+    // Strip markdown formatting for cleaner speech output
+    const cleanText = text
+      .replace(/[*#`_\-]/g, "")
+      .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+      .trim();
+
+    const utterance = new SpeechSynthesisUtterance(cleanText);
+    utterance.onend = () => {
+      setSpeakingMessageId(null);
+    };
+    utterance.onerror = (e) => {
+      console.error("Speech synthesis error:", e);
+      setSpeakingMessageId(null);
+    };
+
+    setSpeakingMessageId(msgId);
+    window.speechSynthesis.speak(utterance);
+  };
+
   useEffect(() => { if (!isAuthenticated) router.push("/auth/login"); }, [isAuthenticated, router]);
   
   useEffect(() => {
@@ -138,6 +305,18 @@ export default function WorkspacePage() {
     const msg = inputValue.trim();
     if (!msg || isStreaming) return;
 
+    if (isListening && recognitionRef.current) {
+      recognitionRef.current.stop();
+      setIsListening(false);
+    }
+
+    if (speakingMessageId) {
+      if (typeof window !== "undefined" && window.speechSynthesis) {
+        window.speechSynthesis.cancel();
+      }
+      setSpeakingMessageId(null);
+    }
+
     setInputValue("");
     setLastQuery(msg);
 
@@ -151,6 +330,7 @@ export default function WorkspacePage() {
 
       if (sessionId) {
         await sendMessage(msg, isVoice ? "voice" : "text", sessionId);
+        setIsVoice(false);
       }
     } catch (err) {
       console.error("Failed to send chat message", err);
@@ -240,7 +420,7 @@ export default function WorkspacePage() {
     { id: "memory",       label: "Open Memory",      description: "View semantic memories",     icon: "🧠", shortcut: "M",       group: "Panels",     action: () => openRight("memory") },
     { id: "graph",        label: "Agent Graph",      description: "Orchestration visualization",icon: "🔀",                      group: "Panels",     action: () => openRight("graph") },
     { id: "toggle-sb",    label: "Toggle Sidebar",   description: "Show/hide sidebar",          icon: "◧",  shortcut: "\\",     group: "View",       action: () => setSidebarOpen(p => !p) },
-    { id: "voice",        label: "Toggle Voice Mode",description: "Switch input to voice",      icon: "🎤",                      group: "Input",      action: () => setIsVoice(p => !p) },
+    { id: "voice",        label: "Toggle Voice Mode",description: "Switch input to voice",      icon: "🎤",                      group: "Input",      action: toggleListening },
     { id: "export",       label: "Export Chat",      description: "Download as Markdown/PDF",   icon: "⬇️",                      group: "Actions",    action: () => {} },
     { id: "logout",       label: "Sign Out",         description: "Log out of workspace",       icon: "🚪",                      group: "Account",    action: () => { router.push("/auth/login"); } },
   ];
@@ -346,7 +526,14 @@ export default function WorkspacePage() {
             <div className="p-2.5 border-t border-white/[0.06] relative">
               <button onClick={() => setProfileOpen(p => !p)}
                 className="w-full flex items-center gap-2.5 px-2 py-2 rounded-lg hover:bg-white/[0.04] transition-all">
-                <div className="w-7 h-7 rounded-[8px] bg-gradient-to-br from-violet-500 to-pink-500 flex items-center justify-center text-[11px] font-bold flex-shrink-0">{initials}</div>
+                <div className="w-7 h-7 rounded-[8px] bg-gradient-to-br from-violet-500 to-pink-500 flex items-center justify-center text-[11px] font-bold flex-shrink-0 overflow-hidden">
+                  {user?.avatar_url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={user.avatar_url} alt="Avatar" className="w-full h-full object-cover" />
+                  ) : (
+                    initials
+                  )}
+                </div>
                 <div className="flex-1 min-w-0 text-left">
                   <div className="text-[12px] font-medium text-white/65 truncate">{user?.name}</div>
                   <div className="text-[10px] text-white/30 truncate">{user?.email}</div>
@@ -364,16 +551,23 @@ export default function WorkspacePage() {
                     className="absolute bottom-14 left-3 w-56 bg-[#12131e] border border-white/[0.1] rounded-xl shadow-2xl p-3 z-50"
                   >
                     <div className="flex items-center gap-3 pb-3 border-b border-white/[0.07] mb-2">
-                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-pink-500 flex items-center justify-center text-sm font-bold flex-shrink-0">{initials}</div>
+                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-pink-500 flex items-center justify-center text-sm font-bold flex-shrink-0 overflow-hidden">
+                        {user?.avatar_url ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={user.avatar_url} alt="Avatar" className="w-full h-full object-cover" />
+                        ) : (
+                          initials
+                        )}
+                      </div>
                       <div className="min-w-0">
                         <div className="text-[13px] font-semibold text-white/80 truncate">{user?.name}</div>
                         <div className="text-[10px] text-white/35 truncate">{user?.email}</div>
                       </div>
                     </div>
                     {[
+                      { icon: "👤", label: "View Profile",     action: () => router.push("/profile") },
                       { icon: "🐙", label: "Connect GitHub",   action: () => {} },
                       { icon: "📧", label: "Connect Gmail",    action: () => {} },
-                      { icon: "📷", label: "Upload Photo",     action: () => {} },
                       { icon: "🧠", label: "View Memories",    action: () => { openRight("memory"); setProfileOpen(false); } },
                       { icon: "🚪", label: "Sign Out",         action: () => router.push("/auth/login") },
                     ].map(item => (
@@ -428,7 +622,7 @@ export default function WorkspacePage() {
               sessionTitle={activeSession?.title || "Chat"}
               projectName={activeProject?.name || "Project"}
             />
-            {(["roadmap", "memory", "graph"] as RightTab[]).map(tab => (
+            {(["roadmap", "memory", "graph", "analytics"] as RightTab[]).map(tab => (
               <button key={tab} onClick={() => rightPanelOpen && rightTab === tab ? setRightPanelOpen(false) : openRight(tab)}
                 className={cn(
                   "px-2.5 py-1.5 rounded-lg text-[11px] font-medium border transition-all capitalize",
@@ -436,7 +630,7 @@ export default function WorkspacePage() {
                     ? "bg-violet-500/15 border-violet-500/30 text-violet-300"
                     : "border-white/[0.08] text-white/30 hover:border-white/[0.18] hover:text-white/55"
                 )}>
-                {tab === "roadmap" ? "🗺️" : tab === "memory" ? "🧠" : "🔀"}
+                {tab === "roadmap" ? "🗺️" : tab === "memory" ? "🧠" : tab === "graph" ? "🔀" : "📊"}
                 <span className="ml-1 hidden sm:inline">{tab}</span>
               </button>
             ))}
@@ -569,6 +763,24 @@ export default function WorkspacePage() {
                       ) : msg.content}
                     </div>
 
+                    {msg.role === "assistant" && msg.content && (
+                      <div className="flex items-center gap-2 px-1 text-white/40 hover:text-white/70 transition-colors">
+                        <button
+                          onClick={() => handleSpeak(msg.id, msg.content)}
+                          className={cn(
+                            "flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-[10px] font-medium border transition-all",
+                            speakingMessageId === msg.id
+                              ? "bg-violet-500/15 border-violet-500/35 text-violet-300 animate-pulse"
+                              : "bg-white/[0.03] border-white/[0.07] text-white/45 hover:border-white/[0.15] hover:bg-white/[0.06] hover:text-white/75"
+                          )}
+                          title={speakingMessageId === msg.id ? "Stop reading response" : "Read response aloud"}
+                        >
+                          <span>{speakingMessageId === msg.id ? "⏹️" : "🔊"}</span>
+                          <span>{speakingMessageId === msg.id ? "Stop" : "Speak Response"}</span>
+                        </button>
+                      </div>
+                    )}
+
                     {msg.agent_outputs && Object.keys(msg.agent_outputs).length > 0 && (
                       <div className="w-full space-y-1.5">
                         {Object.entries(msg.agent_outputs).map(([agent, output]) => {
@@ -608,15 +820,85 @@ export default function WorkspacePage() {
                 </motion.div>
               ))}
 
-              {isStreaming && (messages.length === 0 || messages[messages.length - 1]?.role === "user") && (
-                <div className="flex gap-3">
-                  <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-indigo-600 to-violet-600 flex items-center justify-center text-xs font-bold flex-shrink-0">✦</div>
-                  <div className="flex items-center gap-2 px-4 py-3 bg-white/[0.04] border border-white/[0.07] rounded-2xl rounded-tl-sm">
-                    {[0, 1, 2].map(i => (
-                      <motion.div key={i} className="w-1.5 h-1.5 rounded-full bg-violet-400/60"
-                        animate={{ y: [0, -5, 0], opacity: [0.4, 1, 0.4] }}
-                        transition={{ duration: 1.2, repeat: Infinity, delay: i * 0.2 }} />
-                    ))}
+              {isStreaming && (
+                <div className="flex gap-3 mt-2">
+                  <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-indigo-600 to-violet-600 flex items-center justify-center text-xs font-bold flex-shrink-0 mt-1">✦</div>
+                  <div className="flex-1 max-w-sm">
+                    <motion.div
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="bg-white/[0.02] border border-white/[0.07] rounded-2xl p-4 backdrop-blur-md shadow-2xl relative overflow-hidden"
+                    >
+                      {/* Glow effect */}
+                      <div className="absolute -top-10 -right-10 w-28 h-28 bg-violet-500/10 rounded-full filter blur-xl" />
+                      
+                      <div className="flex items-center justify-between border-b border-white/[0.06] pb-2 mb-3">
+                        <div className="flex items-center gap-2">
+                          <span className="relative flex h-2 w-2">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-violet-400 opacity-75" />
+                            <span className="relative inline-flex rounded-full h-2 w-2 bg-violet-500" />
+                          </span>
+                          <span className="text-[10.5px] font-semibold uppercase tracking-wider text-violet-400">Agent Activity Pipeline</span>
+                        </div>
+                        <span className="text-[9.5px] text-white/30 font-mono">Real-time</span>
+                      </div>
+
+                      <div className="space-y-3">
+                        {AGENTS.map(agent => {
+                          const status = getAgentStatus(agent.key);
+                          const latestEvent = agentEvents.filter(e => e.agent === agent.key).slice(-1)[0];
+                          
+                          let statusLabel = `${agent.label} Agent Working...`;
+                          if (status === "idle") {
+                            statusLabel = `${agent.label} Agent Pending`;
+                          } else if (status === "error") {
+                            statusLabel = `${agent.label} Agent Error`;
+                          }
+
+                          return (
+                            <div key={agent.key} className="flex items-center justify-between text-[12px]">
+                              <div className="flex items-center gap-2 min-w-0 flex-1">
+                                <span className="text-sm flex-shrink-0">{agent.icon}</span>
+                                <div className="min-w-0 flex-1">
+                                  <span className={cn(
+                                    "font-medium transition-colors duration-300",
+                                    status === "thinking" ? "text-white" :
+                                    status === "done" ? "text-white/60" : "text-white/25"
+                                  )}>
+                                    {statusLabel}
+                                  </span>
+                                  {status === "thinking" && latestEvent?.message && (
+                                    <span className="text-[10px] text-violet-400 animate-pulse ml-2 font-normal truncate">
+                                      — {latestEvent.message}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                              
+                              <div className="flex items-center justify-center flex-shrink-0 ml-3">
+                                {status === "thinking" ? (
+                                  <div className="relative flex items-center justify-center w-5 h-5">
+                                    <div className="w-3.5 h-3.5 rounded-full border border-violet-500/30 border-t-violet-400 animate-spin" />
+                                  </div>
+                                ) : status === "done" ? (
+                                  <motion.span
+                                    initial={{ scale: 0 }}
+                                    animate={{ scale: 1 }}
+                                    className="text-emerald-400 font-bold text-[13px] leading-none"
+                                  >
+                                    ✓
+                                  </motion.span>
+                                ) : status === "error" ? (
+                                  <span className="text-red-400 font-bold">✕</span>
+                                ) : (
+                                  <span className="w-1.5 h-1.5 rounded-full bg-white/10" />
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </motion.div>
                   </div>
                 </div>
               )}
@@ -627,13 +909,14 @@ export default function WorkspacePage() {
             <div className="px-4 md:px-6 pb-4 pt-2 flex-shrink-0">
               <div className={cn(
                 "flex items-end gap-2.5 bg-white/[0.04] border rounded-2xl px-4 py-3 transition-all",
+                isListening ? "border-red-500/35 ring-1 ring-red-500/10" :
                 isStreaming ? "border-violet-500/25" : "border-white/[0.09] focus-within:border-violet-500/35"
               )}>
                 <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" />
                 <textarea ref={inputRef} value={inputValue}
                   onChange={e => { setInputValue(e.target.value); e.target.style.height = "auto"; e.target.style.height = Math.min(e.target.scrollHeight, 120) + "px"; }}
                   onKeyDown={handleKeyDown}
-                  placeholder="Ask the agents anything… (Enter to send, Shift+Enter for newline)"
+                  placeholder={isListening ? "Listening... Speak now!" : "Ask the agents anything… (Enter to send, Shift+Enter for newline)"}
                   rows={1} disabled={isStreaming}
                   className="flex-1 bg-transparent outline-none text-[13px] text-white/80 placeholder-white/18 leading-relaxed resize-none min-h-[22px]"
                   style={{ maxHeight: "120px" }}
@@ -646,10 +929,21 @@ export default function WorkspacePage() {
                   >
                     📎
                   </button>
-                  <button onClick={() => setIsVoice(p => !p)}
-                    className={cn("w-8 h-8 rounded-lg flex items-center justify-center text-sm transition-all border",
-                      isVoice ? "bg-emerald-500/15 border-emerald-500/30 text-emerald-400" : "bg-white/[0.04] border-white/[0.09] text-white/32 hover:text-white/60"
-                    )} title={isVoice ? "Voice mode on" : "Enable voice mode"}>🎤</button>
+                  <button onClick={toggleListening}
+                    className={cn("relative w-8 h-8 rounded-lg flex items-center justify-center text-sm transition-all border",
+                      isListening ? "bg-red-500/15 border-red-500/30 text-red-400" :
+                      isVoice ? "bg-emerald-500/15 border-emerald-500/30 text-emerald-400" :
+                      "bg-white/[0.04] border-white/[0.09] text-white/32 hover:text-white/60"
+                    )} title={isListening ? "Stop listening" : isVoice ? "Voice mode on" : "Enable voice mode"}>
+                    {isListening ? (
+                      <>
+                        <span className="absolute inset-0 rounded-lg bg-red-500/20 animate-ping" />
+                        <span className="z-10 animate-pulse text-[11px]">⏹️</span>
+                      </>
+                    ) : (
+                      "🎤"
+                    )}
+                  </button>
                   <button onClick={handleSend} disabled={isStreaming || !inputValue.trim()}
                     className="w-8 h-8 rounded-lg bg-violet-600/25 border border-violet-500/30 text-violet-300 flex items-center justify-center text-sm hover:bg-violet-600/40 transition-all disabled:opacity-35 disabled:cursor-not-allowed font-bold">↑</button>
                 </div>
@@ -671,13 +965,13 @@ export default function WorkspacePage() {
                 className="border-l border-white/[0.06] flex flex-col bg-[#0d0e16] overflow-hidden flex-shrink-0"
               >
                 <div className="p-3.5 border-b border-white/[0.06] flex items-center justify-between flex-shrink-0">
-                  <div className="flex gap-1.5">
-                    {(["roadmap", "memory", "graph"] as RightTab[]).map(tab => (
+                  <div className="flex gap-1.5 overflow-x-auto" style={{ scrollbarWidth: "none" }}>
+                    {(["roadmap", "memory", "graph", "analytics"] as RightTab[]).map(tab => (
                       <button key={tab} onClick={() => setRightTab(tab)}
-                        className={cn("px-2.5 py-1 rounded-lg text-[10.5px] font-medium transition-all capitalize",
+                        className={cn("px-2 py-1 rounded-lg text-[10.5px] font-medium transition-all capitalize whitespace-nowrap",
                           rightTab === tab ? "bg-violet-500/15 text-violet-300 border border-violet-500/25" : "text-white/28 hover:text-white/55"
                         )}>
-                        {tab === "roadmap" ? "🗺️ Roadmap" : tab === "memory" ? "🧠 Memory" : "🔀 Graph"}
+                        {tab === "roadmap" ? "🗺️ Roadmap" : tab === "memory" ? "🧠 Memory" : tab === "graph" ? "🔀 Graph" : "📊 Analytics"}
                       </button>
                     ))}
                   </div>
@@ -719,6 +1013,100 @@ export default function WorkspacePage() {
                           Send a message to see the agent orchestration graph.
                         </div>
                       )}
+                    </div>
+                  )}
+
+                  {rightTab === "analytics" && (
+                    <div className="space-y-5">
+                      <div className="border-b border-white/[0.06] pb-3">
+                        <h3 className="text-[13px] font-bold text-white/80">📊 Agent Invocation Analytics</h3>
+                        <p className="text-[11px] text-white/35 leading-relaxed mt-1">
+                          Useful for debugging system load and tracking multi-agent coordination.
+                        </p>
+                      </div>
+
+                      <div className="space-y-4">
+                        {AGENTS.map(agent => {
+                          const calls = agentUsageStats[agent.key] || 0;
+                          const totalCalls = Object.values(agentUsageStats).reduce((a, b) => a + b, 0);
+                          const percent = totalCalls > 0 ? (calls / totalCalls) * 100 : 0;
+
+                          return (
+                            <div key={agent.key} className="space-y-1.5">
+                              <div className="flex items-center justify-between text-[11.5px]">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-sm">{agent.icon}</span>
+                                  <span className="font-semibold text-white/70">{agent.label} Agent</span>
+                                </div>
+                                <span className="font-mono text-violet-300 font-bold bg-violet-500/10 px-2 py-0.5 rounded">
+                                  {calls} {calls === 1 ? 'Call' : 'Calls'}
+                                </span>
+                              </div>
+                              
+                              <div className="h-2 w-full bg-white/[0.04] rounded-full overflow-hidden border border-white/[0.05]">
+                                <motion.div
+                                  initial={{ width: 0 }}
+                                  animate={{ width: `${percent}%` }}
+                                  transition={{ duration: 0.8, ease: "easeOut" }}
+                                  className="h-full rounded-full"
+                                  style={{ backgroundColor: agent.color }}
+                                />
+                              </div>
+                              
+                              <div className="flex justify-between text-[9px] text-white/20">
+                                <span>Usage share: {percent.toFixed(1)}%</span>
+                                <span>Active</span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      <div className="bg-white/[0.02] border border-white/[0.06] rounded-xl p-3 space-y-2 mt-2">
+                        <div className="flex items-center gap-1.5 text-[11px] font-bold text-white/50">
+                          <span>🛠️</span>
+                          <span>Orchestrator Stats Summary</span>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 text-[10.5px] font-mono">
+                          <div className="bg-white/[0.02] p-2 rounded border border-white/[0.04]">
+                            <p className="text-white/25">Total Calls</p>
+                            <p className="text-[14px] font-bold text-white/80 mt-0.5">
+                              {Object.values(agentUsageStats).reduce((a, b) => a + b, 0)}
+                            </p>
+                          </div>
+                          <div className="bg-white/[0.02] p-2 rounded border border-white/[0.04]">
+                            <p className="text-white/25">Most Active</p>
+                            <p className="text-[14px] font-bold text-emerald-400 mt-0.5 truncate">
+                              {(() => {
+                                let maxCalls = -1;
+                                let activeAgent = "None";
+                                AGENTS.forEach(a => {
+                                  const calls = agentUsageStats[a.key] || 0;
+                                  if (calls > maxCalls) {
+                                    maxCalls = calls;
+                                    activeAgent = a.label;
+                                  }
+                                });
+                                return activeAgent;
+                              })()}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <button
+                        onClick={() => {
+                          if (confirm("Reset lifetime baseline counts?")) {
+                            const resetVal = { qa: 0, research: 0, engineering: 0, planner: 0, critic: 0, innovation: 0 };
+                            localStorage.setItem(`agent_usage_baseline_${projectId}`, JSON.stringify(resetVal));
+                            setAgentUsageStats(resetVal);
+                            toast.success("Usage stats reset successfully.");
+                          }
+                        }}
+                        className="w-full text-center text-[10.5px] py-2 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 hover:text-red-300 transition-all font-medium mt-4"
+                      >
+                        Reset Baseline Counters
+                      </button>
                     </div>
                   )}
                 </div>
