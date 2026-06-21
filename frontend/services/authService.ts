@@ -28,6 +28,19 @@ export async function login(data: LoginRequest): Promise<AuthTokens> {
 }
 
 // ─────────────────────────────────────────
+// SOCIAL LOGIN (Google & GitHub)
+// ─────────────────────────────────────────
+export async function socialLogin(data: {
+  email: string;
+  name: string;
+  avatar_url?: string;
+  provider: string;
+}): Promise<AuthTokens> {
+  const response = await api.post<AuthTokens>("/api/auth/social-login", data);
+  return response.data;
+}
+
+// ─────────────────────────────────────────
 // GET CURRENT USER
 // Frontend calls this on load to restore session
 // ─────────────────────────────────────────

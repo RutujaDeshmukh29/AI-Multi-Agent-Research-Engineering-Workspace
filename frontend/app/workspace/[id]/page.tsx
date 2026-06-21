@@ -451,7 +451,7 @@ export default function WorkspacePage() {
   ];
 
   return (
-    <div className="flex h-screen bg-[#06070d] text-white overflow-hidden font-sans relative antialiased">
+    <div className="fixed inset-0 flex bg-[#06070d] text-white overflow-hidden font-sans antialiased">
       
       {/* Background Gradients & Ambient Glow */}
       <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-violet-600/10 rounded-full blur-[160px] pointer-events-none z-0" />
@@ -645,7 +645,7 @@ export default function WorkspacePage() {
       </AnimatePresence>
 
       {/* Main Workspace Workspace Content */}
-      <div className="flex-1 flex flex-col min-w-0 z-10 relative">
+      <div className="flex-1 h-full flex flex-col min-w-0 z-10 relative">
 
         {/* Workspace Top Bar Header */}
         <div className="h-14 border-b border-white/[0.06] flex items-center justify-between px-4 md:px-5 gap-3 bg-[#06070d]/75 backdrop-blur-md z-10">
@@ -1053,12 +1053,12 @@ export default function WorkspacePage() {
               <div ref={messagesEndRef} />
             </div>
 
-            {/* Bottom floating Command Prompt Input Panel */}
-            <div className="px-4 md:px-8 pb-5 pt-2 flex-shrink-0">
+            {/* Bottom Command Prompt Input Panel */}
+            <div className="w-full bg-[#07080e]/95 backdrop-blur-xl border-t border-white/[0.06] py-3.5 px-4 md:px-8 flex-shrink-0 z-10">
               <div className="max-w-4xl mx-auto w-full">
                 
                 <div className={cn(
-                  "bg-[#0e1017]/90 border rounded-2xl p-3 transition-all backdrop-blur-xl shadow-2xl flex flex-col gap-2.5",
+                  "bg-[#0e1017]/70 border border-white/[0.08] rounded-xl p-3 transition-all flex flex-col gap-2.5",
                   isListening ? "border-red-500/40 ring-1 ring-red-500/10 bg-red-500/[0.01]" :
                   isStreaming ? "border-violet-500/25" : "border-white/[0.08] focus-within:border-violet-500/40 focus-within:shadow-[0_8px_32px_rgba(139,92,246,0.05)]"
                 )}>

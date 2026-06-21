@@ -55,6 +55,43 @@ export function useAuth() {
     }
   }, [router, setLoading, setTokens, setUser]);
 
+  // ── SOCIAL LOGIN ───────────────────────
+  const socialLogin = useCallback(async (data: { email: string; name: string; avatar_url?: string; provider: string }) => {
+    setLoading(true);
+    try {
+      const tokens = await authService.socialLogin(data);
+      setTokens(tokens.access_token, tokens.refresh_token);
+      setCookieToken(tokens.access_token);
+
+      const me = await authService.getMe();
+      setUser(me);
+
+      // Save to localStorage verification list
+      const verifiedEmailsKey = "nexus_verified_emails";
+      if (typeof window !== "undefined") {
+        let list: string[] = [];
+        const stored = localStorage.getItem(verifiedEmailsKey);
+        if (stored) {
+          try { list = JSON.parse(stored); } catch (e) {}
+        }
+        const emailLower = data.email.toLowerCase().trim();
+        if (!list.includes(emailLower)) {
+          list.push(emailLower);
+          localStorage.setItem(verifiedEmailsKey, JSON.stringify(list));
+        }
+      }
+
+      toast.success(`Authenticated with ${data.provider}! Welcome back, ${me.name}!`);
+      router.push("/dashboard");
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail || "Social authentication failed";
+      toast.error(msg);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, [router, setLoading, setTokens, setUser]);
+
   // ── SIGNUP ─────────────────────────────
   const signup = useCallback(async (data: SignupRequest) => {
     setLoading(true);
@@ -111,5 +148,6 @@ export function useAuth() {
     signup,
     logout,
     restoreSession,
+    socialLogin,
   };
 }

@@ -61,8 +61,8 @@ async def upload_project_file(
 
     try:
         # Text extraction and chunking based on file type
-        # For now, only PDF is handled specifically
         is_pdf = file.content_type == "application/pdf" or file_path.suffix.lower() == ".pdf"
+        is_image = (file.content_type and file.content_type.startswith("image/")) or file_path.suffix.lower() in [".png", ".jpg", ".jpeg", ".webp", ".gif"]
 
         if is_pdf:
             from langchain_community.document_loaders import PyPDFLoader
@@ -85,6 +85,54 @@ async def upload_project_file(
                     chunk_index=i,
                     page_number=chunk.metadata.get("page"),
                 )
+
+        elif is_image:
+            import base64
+            from app.services.groq_service import async_groq_client
+            
+            # Read and encode image to base64
+            image_bytes = file_path.read_bytes()
+            base64_image = base64.b64encode(image_bytes).decode("utf-8")
+            mime_type = file.content_type or "image/png"
+            
+            system_prompt = (
+                "You are an elite expert image parsing agent. Your job is to describe the uploaded image in detail, "
+                "extracting any text, code, tables, numbers, or architectural design diagrams visible within it. "
+                "Make sure to output the extracted information in clear markdown text, retaining any formatting."
+            )
+            
+            response = await async_groq_client.chat.completions.create(
+                model="llama-3.2-11b-vision-preview",
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {
+                        "role": "user",
+                        "content": [
+                            {"type": "text", "text": "Extract all text and describe this project workspace reference image in detail:"},
+                            {
+                                "type": "image_url",
+                                "image_url": {
+                                    "url": f"data:{mime_type};base64,{base64_image}"
+                                }
+                            }
+                        ]
+                    }
+                ],
+                max_tokens=2048,
+                temperature=0.2
+            )
+            
+            description = response.choices[0].message.content.strip()
+            
+            # Generate embedding and store as a single chunk
+            embedding = embed_text(description)
+            await crud.create_file_chunk(
+                db,
+                file_id=db_file.id,
+                content=description,
+                embedding=embedding,
+                chunk_index=0
+            )
 
         else:
             # Generic text file handling

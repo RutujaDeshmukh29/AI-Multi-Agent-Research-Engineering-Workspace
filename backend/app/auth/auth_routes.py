@@ -179,3 +179,42 @@ async def get_me(current_user: User = Depends(get_current_user)):
         created_at=str(current_user.created_at),
         preferences=current_user.preferences or {},
     )
+
+
+class SocialLoginRequest(BaseModel):
+    email: EmailStr
+    name: str
+    avatar_url: Optional[str] = None
+    provider: str  # "google" or "github"
+
+@router.post("/social-login", response_model=TokenResponse)
+async def social_login(body: SocialLoginRequest, db: AsyncSession = Depends(get_db)):
+    """
+    Authenticate or register a user through Social Providers (Google or GitHub).
+    Forces verification to True automatically.
+    """
+    user = await crud.get_user_by_email(db, body.email)
+    if not user:
+        # Create user with a random secure password hash
+        import secrets
+        random_pw = secrets.token_urlsafe(16)
+        hashed = hash_password(random_pw)
+        user = await crud.create_user(db, email=body.email, name=body.name, hashed_password=hashed)
+        logger.info("Social user registered", user_id=str(user.id), provider=body.provider)
+        
+    # Mark verified in preferences
+    prefs = user.preferences or {}
+    prefs["is_verified"] = True
+    if body.avatar_url:
+        prefs["avatar_url"] = body.avatar_url
+    user.preferences = prefs
+    
+    await db.flush()
+    await db.commit()
+    await db.refresh(user)
+    
+    logger.info("Social user logged in", user_id=str(user.id), provider=body.provider)
+    return TokenResponse(
+        access_token=create_access_token(str(user.id)),
+        refresh_token=create_refresh_token(str(user.id)),
+    )
