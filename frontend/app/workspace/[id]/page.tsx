@@ -1,9 +1,6 @@
 "use client";
 // ================================================================
-// app/workspace/[id]/page.tsx  — ROADMAP REFACTORED
-// - Centralized roadmap state in useWorkspaceStore
-// - Using RoadmapPanel component
-// - All API calls point to the correct projectService
+// app/workspace/[id]/page.tsx  — PREMIUM REDESIGNED
 // ================================================================
 
 import { useState, useEffect, useRef } from "react";
@@ -42,6 +39,32 @@ const AGENTS = [
 
 type RightTab = "roadmap" | "memory" | "graph" | "analytics";
 
+// IDE-style Code block with Copy functionality
+function CodeBlock({ code, language }: { code: string; language: string }) {
+  const [copied, setCopied] = useState(false);
+  const handleCopy = () => {
+    navigator.clipboard.writeText(code);
+    setCopied(true);
+    toast.success("Code copied to clipboard!");
+    setTimeout(() => setCopied(false), 2000);
+  };
+  return (
+    <div className="bg-[#05060b]/90 border border-white/[0.08] rounded-xl overflow-hidden my-3 shadow-[0_8px_24px_rgba(0,0,0,0.4)]">
+      <div className="flex items-center justify-between px-4 py-2 bg-white/[0.02] border-b border-white/[0.06] text-[10.5px] font-mono text-white/40">
+        <span>{language || "source"}</span>
+        <button onClick={handleCopy} className="hover:text-white/80 transition-colors flex items-center gap-1.5 py-0.5 px-1.5 rounded hover:bg-white/[0.04]">
+          <span>{copied ? "✓" : "📋"}</span>
+          <span>{copied ? "Copied" : "Copy"}</span>
+        </button>
+      </div>
+      <pre className="p-4 overflow-x-auto text-[12px] leading-relaxed font-mono text-white/70 max-h-[400px]" 
+        style={{ scrollbarWidth: "thin", scrollbarColor: "rgba(255,255,255,0.07) transparent" }}>
+        <code>{code}</code>
+      </pre>
+    </div>
+  );
+}
+
 export default function WorkspacePage() {
   const params    = useParams();
   const router    = useRouter();
@@ -56,7 +79,6 @@ export default function WorkspacePage() {
     setActiveProject, 
     setActiveSession, 
   } = useWorkspaceStore();
-
 
   // UI state
   const [sidebarOpen,     setSidebarOpen]     = useState(true);
@@ -80,7 +102,6 @@ export default function WorkspacePage() {
     critic: 19,
     innovation: 25,
   });
-
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef       = useRef<HTMLTextAreaElement>(null);
@@ -430,107 +451,139 @@ export default function WorkspacePage() {
   ];
 
   return (
-    <div className="flex h-screen bg-[#080910] text-white overflow-hidden">
+    <div className="flex h-screen bg-[#06070d] text-white overflow-hidden font-sans relative antialiased">
+      
+      {/* Background Gradients & Ambient Glow */}
+      <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-violet-600/10 rounded-full blur-[160px] pointer-events-none z-0" />
+      <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-emerald-600/5 rounded-full blur-[160px] pointer-events-none z-0" />
+      <div className="absolute top-[30%] right-[20%] w-[40%] h-[40%] bg-indigo-600/5 rounded-full blur-[140px] pointer-events-none z-0" />
+
+      {/* Grid overlay */}
+      <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(255,255,255,0.015)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.015)_1px,transparent_1px)] bg-[size:32px_32px] pointer-events-none z-0 opacity-80" />
 
       <CommandPalette open={cmdOpen} onClose={() => setCmdOpen(false)} commands={commands} />
 
       <AnimatePresence>
         {sidebarOpen && (
           <motion.aside
-            initial={{ x: -224, opacity: 0 }}
+            initial={{ x: -230, opacity: 0 }}
             animate={{ x: 0, opacity: 1 }}
-            exit={{ x: -224, opacity: 0 }}
-            transition={{ type: "spring", stiffness: 320, damping: 32 }}
-            className="w-[220px] flex-shrink-0 bg-[#0d0e16] border-r border-white/[0.06] flex flex-col z-10"
+            exit={{ x: -230, opacity: 0 }}
+            transition={{ type: "spring", stiffness: 350, damping: 35 }}
+            className="w-[230px] flex-shrink-0 bg-[#0a0b12]/95 border-r border-white/[0.06] flex flex-col z-20 backdrop-blur-xl"
           >
-            <div className="p-3.5 border-b border-white/[0.06]">
-              <div className="flex items-center gap-2.5 mb-3">
-                <div className="w-7 h-7 rounded-[9px] bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center text-sm font-bold flex-shrink-0">✦</div>
-                <span className="text-[13px] font-semibold tracking-tight">AI Workspace</span>
+            {/* Sidebar Header */}
+            <div className="p-4 border-b border-white/[0.06] flex flex-col gap-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-violet-600 to-indigo-600 flex items-center justify-center text-sm font-bold flex-shrink-0 shadow-lg shadow-violet-500/15">✦</div>
+                  <span className="text-[13.5px] font-bold tracking-tight bg-gradient-to-r from-white via-white/90 to-white/70 bg-clip-text text-transparent">AI Command Center</span>
+                </div>
               </div>
+              
               <button onClick={handleNewSession}
-                className="w-full flex items-center gap-2 px-3 py-2 rounded-lg bg-violet-500/10 border border-violet-500/25 text-violet-300 text-[12px] font-medium hover:bg-violet-500/18 transition-all">
-                <span className="text-base leading-none">+</span> New Chat
+                className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-violet-600/10 border border-violet-500/25 text-violet-300 text-[12px] font-semibold hover:bg-violet-600/18 hover:border-violet-500/40 hover:scale-[0.98] active:scale-[0.95] transition-all">
+                <span className="text-sm leading-none">+</span> New Chat
               </button>
+              
               <button onClick={() => setCmdOpen(true)}
-                className="w-full mt-2 flex items-center gap-2 px-3 py-1.5 rounded-lg border border-white/[0.06] text-white/20 text-[11px] hover:border-white/[0.12] hover:text-white/40 transition-all">
-                <span>⌘</span><span className="flex-1 text-left">Command palette</span>
-                <kbd className="text-[9px] bg-white/[0.05] px-1.5 py-0.5 rounded font-mono">K</kbd>
+                className="w-full flex items-center justify-between px-3 py-1.5 rounded-lg border border-white/[0.05] bg-white/[0.02] text-white/25 text-[11px] hover:border-white/[0.1] hover:text-white/40 hover:bg-white/[0.04] transition-all">
+                <div className="flex items-center gap-2">
+                  <span>⌘</span>
+                  <span className="text-left font-medium">Command palette</span>
+                </div>
+                <kbd className="text-[9px] bg-white/[0.04] border border-white/[0.08] px-1.5 py-0.5 rounded font-mono text-white/30">K</kbd>
               </button>
             </div>
 
-            <div className="px-2.5 pt-3 pb-1">
-              <p className="text-[9.5px] font-semibold text-white/25 uppercase tracking-widest px-2 mb-2">Projects</p>
-              {projects.map((p: any) => (
-                <button key={p.id} onClick={() => router.push(`/workspace/${p.id}`)}
-                  className={cn(
-                    "w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-left transition-all mb-0.5",
-                    p.id === projectId ? "bg-violet-500/12 text-violet-300" : "text-white/40 hover:bg-white/[0.04] hover:text-white/65"
-                  )}>
-                  <span className="text-sm flex-shrink-0">{p.icon || "🧠"}</span>
-                  <span className="text-[12px] font-medium truncate">{p.name}</span>
-                </button>
-              ))}
+            {/* Projects List */}
+            <div className="px-3 pt-4 pb-1">
+              <p className="text-[9.5px] font-bold text-white/20 uppercase tracking-widest px-2.5 mb-2">Projects</p>
+              <div className="space-y-0.5 max-h-[160px] overflow-y-auto" style={{ scrollbarWidth: "none" }}>
+                {projects.map((p: any) => (
+                  <button key={p.id} onClick={() => router.push(`/workspace/${p.id}`)}
+                    className={cn(
+                      "w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left transition-all hover:scale-[0.98]",
+                      p.id === projectId 
+                        ? "bg-violet-600/12 border border-violet-500/20 text-violet-200 font-semibold" 
+                        : "text-white/40 border border-transparent hover:bg-white/[0.03] hover:text-white/70"
+                    )}>
+                    <span className="text-sm flex-shrink-0">{p.icon || "🧠"}</span>
+                    <span className="text-[12px] truncate">{p.name}</span>
+                  </button>
+                ))}
+              </div>
             </div>
 
-            <div className="px-2.5 pt-2 pb-1 flex-1 overflow-y-auto min-h-0" style={{ scrollbarWidth: "none" }}>
-              <p className="text-[9.5px] font-semibold text-white/25 uppercase tracking-widest px-2 mb-2">Chats</p>
-              {sessions.map((s: any) => (
-                <div key={s.id} className="group relative mb-0.5">
-                  {renameId === s.id ? (
-                    <input autoFocus value={renameVal} onChange={e => setRenameVal(e.target.value)}
-                      onBlur={async () => {
+            {/* Chats List */}
+            <div className="px-3 pt-4 pb-2 flex-1 overflow-y-auto min-h-0" style={{ scrollbarWidth: "none" }}>
+              <p className="text-[9.5px] font-bold text-white/20 uppercase tracking-widest px-2.5 mb-2">Recent Chats</p>
+              <div className="space-y-0.5">
+                {sessions.map((s: any) => (
+                  <div key={s.id} className="group relative">
+                    {renameId === s.id ? (
+                      <input autoFocus value={renameVal} onChange={e => setRenameVal(e.target.value)}
+                        onBlur={async () => {
+                          try {
+                            if (renameVal.trim()) {
+                              await renameSession.mutateAsync({ projectId, sessionId: s.id, title: renameVal });
+                            }
+                          } catch (err) {
+                            console.error("Failed to rename session", err);
+                            toast.error("Unable to rename chat. Please try again.");
+                          } finally {
+                            setRenameId(null);
+                          }
+                        }}
+                        onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); if (e.key === "Escape") setRenameId(null); }}
+                        className="w-full px-2.5 py-1.5 bg-violet-600/10 border border-violet-500/30 rounded-lg text-[12px] text-white outline-none" />
+                    ) : (
+                      <button onClick={() => setActiveSession(s)}
+                        className={cn(
+                          "w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left transition-all border border-transparent pr-14 hover:scale-[0.98]",
+                          s.id === activeSession?.id 
+                            ? "bg-white/[0.06] border-white/[0.05] text-white/80 font-medium" 
+                            : "text-white/35 hover:bg-white/[0.02] hover:text-white/60"
+                        )}>
+                        <span className="text-[10px] opacity-40 flex-shrink-0">{s.mode === "voice" ? "🎤" : "💬"}</span>
+                        <span className="text-[12px] truncate flex-1">{s.title}</span>
+                      </button>
+                    )}
+                    
+                    {/* Rename/Delete Action Buttons */}
+                    <div className="absolute right-2 top-1/2 -translate-y-1/2 hidden group-hover:flex gap-0.5">
+                      <button onClick={() => { setRenameId(s.id); setRenameVal(s.title); }}
+                        className="w-5 h-5 rounded flex items-center justify-center text-[10px] text-white/30 hover:text-white/70 hover:bg-white/10 transition-all" title="Rename">✏</button>
+                      <button onClick={async () => {
                         try {
-                          if (renameVal.trim()) {
-                            await renameSession.mutateAsync({ projectId, sessionId: s.id, title: renameVal });
+                          await deleteSession.mutateAsync({ projectId, sessionId: s.id });
+                          if (activeSession?.id === s.id) {
+                            setActiveSession(null);
+                            setMessages([]);
                           }
                         } catch (err) {
-                          console.error("Failed to rename session", err);
-                          toast.error("Unable to rename chat. Please try again.");
-                        } finally {
-                          setRenameId(null);
+                          console.error("Failed to delete session", err);
+                          toast.error("Unable to delete chat. Please try again.");
                         }
                       }}
-                      onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); if (e.key === "Escape") setRenameId(null); }}
-                      className="w-full px-2.5 py-2 bg-violet-500/10 border border-violet-500/30 rounded-lg text-[12px] text-white/80 outline-none" />
-                  ) : (
-                    <button onClick={() => setActiveSession(s)}
-                      className={cn(
-                        "w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-left transition-all pr-14",
-                        s.id === activeSession?.id ? "bg-white/[0.07] text-white/80" : "text-white/35 hover:bg-white/[0.04] hover:text-white/55"
-                      )}>
-                      <span className="text-[10px] opacity-50 flex-shrink-0">{s.mode === "voice" ? "🎤" : "💬"}</span>
-                      <span className="text-[12px] truncate flex-1">{s.title}</span>
-                    </button>
-                  )}
-                  <div className="absolute right-1.5 top-1/2 -translate-y-1/2 hidden group-hover:flex gap-0.5">
-                    <button onClick={() => { setRenameId(s.id); setRenameVal(s.title); }}
-                      className="w-5 h-5 rounded flex items-center justify-center text-[9px] text-white/30 hover:text-white/60 hover:bg-white/10 transition-all">✏</button>
-                    <button onClick={async () => {
-                      try {
-                        await deleteSession.mutateAsync({ projectId, sessionId: s.id });
-                        if (activeSession?.id === s.id) {
-                          setActiveSession(null);
-                          setMessages([]);
-                        }
-                      } catch (err) {
-                        console.error("Failed to delete session", err);
-                        toast.error("Unable to delete chat. Please try again.");
-                      }
-                    }}
-                      className="w-5 h-5 rounded flex items-center justify-center text-[9px] text-white/30 hover:text-red-400 hover:bg-red-500/10 transition-all">✕</button>
+                        className="w-5 h-5 rounded flex items-center justify-center text-[10px] text-white/30 hover:text-red-400 hover:bg-red-500/10 transition-all" title="Delete">✕</button>
+                    </div>
                   </div>
-                </div>
-              ))}
-              {sessions.length === 0 && (
-                <p className="text-[11px] text-white/18 px-2 py-4 text-center leading-relaxed">No chats yet.<br/>Click <strong className="text-white/35">+ New Chat</strong> above.</p>
-              )}
+                ))}
+                
+                {sessions.length === 0 && (
+                  <div className="flex flex-col items-center justify-center py-8 text-center px-4">
+                    <p className="text-[11px] text-white/15 leading-relaxed">No chats in this workspace.<br/>Click <strong className="text-white/35 font-medium">+ New Chat</strong>.</p>
+                  </div>
+                )}
+              </div>
             </div>
 
-            <div className="p-2.5 border-t border-white/[0.06] relative">
+            {/* Profile & Settings (Bottom) */}
+            <div className="p-3 border-t border-white/[0.06] relative bg-[#090a10]">
               <button onClick={() => setProfileOpen(p => !p)}
-                className="w-full flex items-center gap-2.5 px-2 py-2 rounded-lg hover:bg-white/[0.04] transition-all">
-                <div className="w-7 h-7 rounded-[8px] bg-gradient-to-br from-violet-500 to-pink-500 flex items-center justify-center text-[11px] font-bold flex-shrink-0 overflow-hidden">
+                className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl hover:bg-white/[0.03] border border-transparent hover:border-white/[0.04] transition-all">
+                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-500 to-pink-500 flex items-center justify-center text-[11px] font-bold flex-shrink-0 overflow-hidden ring-2 ring-white/10">
                   {user?.avatar_url ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={user.avatar_url} alt="Avatar" className="w-full h-full object-cover" />
@@ -539,8 +592,8 @@ export default function WorkspacePage() {
                   )}
                 </div>
                 <div className="flex-1 min-w-0 text-left">
-                  <div className="text-[12px] font-medium text-white/65 truncate">{user?.name}</div>
-                  <div className="text-[10px] text-white/30 truncate">{user?.email}</div>
+                  <div className="text-[12px] font-semibold text-white/70 truncate">{user?.name}</div>
+                  <div className="text-[10px] text-white/35 truncate">{user?.email}</div>
                 </div>
                 <span className="text-white/20 text-[11px]">⚙</span>
               </button>
@@ -548,14 +601,14 @@ export default function WorkspacePage() {
               <AnimatePresence>
                 {profileOpen && (
                   <motion.div
-                    initial={{ opacity: 0, y: 8, scale: 0.95 }}
+                    initial={{ opacity: 0, y: 12, scale: 0.95 }}
                     animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: 8, scale: 0.95 }}
-                    transition={{ duration: 0.15 }}
-                    className="absolute bottom-14 left-3 w-56 bg-[#12131e] border border-white/[0.1] rounded-xl shadow-2xl p-3 z-50"
+                    exit={{ opacity: 0, y: 12, scale: 0.95 }}
+                    transition={{ duration: 0.15, type: "spring", stiffness: 350, damping: 25 }}
+                    className="absolute bottom-16 left-3 w-[204px] bg-[#0c0d15] border border-white/[0.08] rounded-xl shadow-[0_12px_40px_rgba(0,0,0,0.6)] p-2.5 z-50 backdrop-blur-xl"
                   >
-                    <div className="flex items-center gap-3 pb-3 border-b border-white/[0.07] mb-2">
-                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-pink-500 flex items-center justify-center text-sm font-bold flex-shrink-0 overflow-hidden">
+                    <div className="flex items-center gap-2.5 pb-2.5 border-b border-white/[0.06] mb-2 px-1">
+                      <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-500 to-pink-500 flex items-center justify-center text-[11px] font-bold flex-shrink-0 overflow-hidden">
                         {user?.avatar_url ? (
                           // eslint-disable-next-line @next/next/no-img-element
                           <img src={user.avatar_url} alt="Avatar" className="w-full h-full object-cover" />
@@ -564,22 +617,25 @@ export default function WorkspacePage() {
                         )}
                       </div>
                       <div className="min-w-0">
-                        <div className="text-[13px] font-semibold text-white/80 truncate">{user?.name}</div>
-                        <div className="text-[10px] text-white/35 truncate">{user?.email}</div>
+                        <div className="text-[11.5px] font-bold text-white/80 truncate">{user?.name}</div>
+                        <div className="text-[9.5px] text-white/30 truncate">{user?.email}</div>
                       </div>
                     </div>
-                    {[
-                      { icon: "👤", label: "View Profile",     action: () => router.push("/profile") },
-                      { icon: "🐙", label: "Connect GitHub",   action: () => {} },
-                      { icon: "📧", label: "Connect Gmail",    action: () => {} },
-                      { icon: "🧠", label: "View Memories",    action: () => { openRight("memory"); setProfileOpen(false); } },
-                      { icon: "🚪", label: "Sign Out",         action: () => router.push("/auth/login") },
-                    ].map(item => (
-                      <button key={item.label} onClick={() => { item.action(); setProfileOpen(false); }}
-                        className="w-full flex items-center gap-2.5 px-2 py-2 rounded-lg text-[12px] text-white/50 hover:text-white/75 hover:bg-white/[0.05] transition-all">
-                        <span className="w-4 text-center">{item.icon}</span>{item.label}
-                      </button>
-                    ))}
+                    
+                    <div className="space-y-0.5">
+                      {[
+                        { icon: "👤", label: "View Profile",     action: () => router.push("/profile") },
+                        { icon: "🐙", label: "Connect GitHub",   action: () => {} },
+                        { icon: "📧", label: "Connect Gmail",    action: () => {} },
+                        { icon: "🧠", label: "View Memories",    action: () => { openRight("memory"); setProfileOpen(false); } },
+                        { icon: "🚪", label: "Sign Out",         action: () => router.push("/auth/login") },
+                      ].map(item => (
+                        <button key={item.label} onClick={() => { item.action(); setProfileOpen(false); }}
+                          className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-[11.5px] text-white/50 hover:text-white/80 hover:bg-white/[0.04] transition-all text-left">
+                          <span className="w-4 text-center mr-1 text-[11px]">{item.icon}</span>{item.label}
+                        </button>
+                      ))}
+                    </div>
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -588,100 +644,138 @@ export default function WorkspacePage() {
         )}
       </AnimatePresence>
 
-      <div className="flex-1 flex flex-col min-w-0">
+      {/* Main Workspace Workspace Content */}
+      <div className="flex-1 flex flex-col min-w-0 z-10 relative">
 
-        <div className="h-12 border-b border-white/[0.06] flex items-center px-4 gap-3 flex-shrink-0 bg-[#080910]/90 backdrop-blur-sm">
-          <button onClick={() => setSidebarOpen(p => !p)}
-            className="w-7 h-7 flex items-center justify-center rounded-lg text-white/30 hover:text-white/60 hover:bg-white/[0.06] transition-all text-sm flex-shrink-0">☰</button>
+        {/* Workspace Top Bar Header */}
+        <div className="h-14 border-b border-white/[0.06] flex items-center justify-between px-4 md:px-5 gap-3 bg-[#06070d]/75 backdrop-blur-md z-10">
+          <div className="flex items-center gap-3 min-w-0">
+            <button onClick={() => setSidebarOpen(p => !p)}
+              className="w-8 h-8 flex items-center justify-center rounded-lg border border-white/[0.05] bg-white/[0.02] text-white/40 hover:text-white/80 hover:bg-white/[0.05] transition-all text-[12px] flex-shrink-0 shadow-sm"
+              title="Toggle sidebar">
+              ☰
+            </button>
 
-          <div className="flex-1 min-w-0">
-            <span className="text-[12.5px] font-medium text-white/50 truncate">
-              {activeProject?.name || "Workspace"}
-              {activeSession && <span className="text-white/25"> / {activeSession.title}</span>}
-            </span>
+            <div className="flex items-center gap-2 text-[12.5px] font-semibold text-white/40 truncate">
+              <span className="hover:text-white/60 cursor-pointer transition-colors" onClick={() => router.push("/dashboard")}>Projects</span>
+              <span className="text-white/15">/</span>
+              <span className="text-white/80 font-bold bg-white/[0.03] px-2 py-0.5 border border-white/[0.05] rounded-md truncate max-w-[140px] md:max-w-xs">{activeProject?.name || "Workspace"}</span>
+              {activeSession && (
+                <>
+                  <span className="text-white/15">/</span>
+                  <span className="text-violet-400 font-medium truncate max-w-[100px] md:max-w-[180px]">{activeSession.title}</span>
+                </>
+              )}
+            </div>
           </div>
 
-          <div className="hidden lg:flex items-center gap-1.5">
+          {/* Real-time Agent Status Waveform Pulsers */}
+          <div className="hidden xl:flex items-center gap-2">
             {AGENTS.slice(1).map(a => {
               const st = getAgentStatus(a.key);
               return (
                 <div key={a.key} className={cn(
-                  "flex items-center gap-1 px-2 py-1 rounded-full border text-[10px] font-medium transition-all",
-                  st === "thinking" ? "border-violet-500/40 bg-violet-500/10 text-violet-300" :
-                  st === "done"     ? "border-emerald-500/30 bg-emerald-500/8 text-emerald-400" :
-                                      "border-white/[0.07] text-white/22"
+                  "flex items-center gap-1.5 px-3 py-1 rounded-full border text-[10px] font-semibold tracking-wide transition-all duration-300",
+                  st === "thinking" 
+                    ? "border-violet-500/40 bg-violet-500/10 text-violet-300 shadow-[0_0_15px_rgba(139,92,246,0.15)] animate-pulse" 
+                    : st === "done"     
+                      ? "border-emerald-500/30 bg-emerald-500/8 text-emerald-400" 
+                      : "border-white/[0.05] bg-white/[0.01] text-white/25"
                 )}>
-                  {st === "thinking" && <span className="w-1.5 h-1.5 rounded-full bg-violet-400 animate-pulse" />}
-                  {st === "done"     && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />}
-                  {st === "idle"     && <span className="w-1.5 h-1.5 rounded-full bg-white/12" />}
-                  {a.icon}
+                  {st === "thinking" ? (
+                    <div className="flex items-center gap-0.5 w-2 h-2.5 mr-0.5">
+                      <span className="w-[1.5px] h-2 bg-violet-400 rounded-full animate-bounce [animation-delay:0.1s]" />
+                      <span className="w-[1.5px] h-3 bg-violet-400 rounded-full animate-bounce [animation-delay:0.3s]" />
+                      <span className="w-[1.5px] h-1.5 bg-violet-400 rounded-full animate-bounce [animation-delay:0.5s]" />
+                    </div>
+                  ) : st === "done" ? (
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                  ) : (
+                    <span className="w-1.5 h-1.5 rounded-full bg-white/10" />
+                  )}
+                  <span>{a.icon} {a.label}</span>
                 </div>
               );
             })}
           </div>
 
-          <div className="flex items-center gap-1.5 flex-shrink-0">
+          {/* Utility buttons */}
+          <div className="flex items-center gap-2 flex-shrink-0">
             <ExportChat
               messages={messages}
               sessionTitle={activeSession?.title || "Chat"}
               projectName={activeProject?.name || "Project"}
             />
-            {(["roadmap", "memory", "graph", "analytics"] as RightTab[]).map(tab => (
-              <button key={tab} onClick={() => rightPanelOpen && rightTab === tab ? setRightPanelOpen(false) : openRight(tab)}
-                className={cn(
-                  "px-2.5 py-1.5 rounded-lg text-[11px] font-medium border transition-all capitalize",
-                  rightPanelOpen && rightTab === tab
-                    ? "bg-violet-500/15 border-violet-500/30 text-violet-300"
-                    : "border-white/[0.08] text-white/30 hover:border-white/[0.18] hover:text-white/55"
-                )}>
-                {tab === "roadmap" ? "🗺️" : tab === "memory" ? "🧠" : tab === "graph" ? "🔀" : "📊"}
-                <span className="ml-1 hidden sm:inline">{tab}</span>
-              </button>
-            ))}
+            
+            <div className="h-6 w-[1px] bg-white/[0.08] mx-1 hidden sm:block" />
+
+            <div className="flex items-center gap-1">
+              {(["roadmap", "memory", "graph", "analytics"] as RightTab[]).map(tab => (
+                <button key={tab} onClick={() => rightPanelOpen && rightTab === tab ? setRightPanelOpen(false) : openRight(tab)}
+                  className={cn(
+                    "p-2 rounded-lg border text-[11px] font-medium transition-all hover:scale-[0.98] active:scale-[0.95] flex items-center justify-center gap-1.5",
+                    rightPanelOpen && rightTab === tab
+                      ? "bg-violet-500/15 border-violet-500/30 text-violet-300 shadow-lg shadow-violet-500/5"
+                      : "border-white/[0.06] bg-white/[0.01] text-white/35 hover:border-white/[0.15] hover:text-white/60"
+                  )}>
+                  <span>
+                    {tab === "roadmap" ? "🗺️" : tab === "memory" ? "🧠" : tab === "graph" ? "🔀" : "📊"}
+                  </span>
+                  <span className="hidden md:inline capitalize">{tab}</span>
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
+        {/* Live Streaming pipeline overlay indicator */}
         <AnimatePresence>
           {agentEvents.length > 0 && isStreaming && (
             <motion.div
               initial={{ height: 0, opacity: 0 }}
               animate={{ height: "auto", opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}
-              className="border-b border-white/[0.04] bg-black/20 px-4 py-2 flex items-center gap-2 flex-wrap flex-shrink-0"
+              className="border-b border-white/[0.05] bg-black/30 backdrop-blur-md px-4 py-2 flex items-center gap-2 flex-wrap flex-shrink-0 z-10"
             >
-              <span className="flex items-center gap-1.5 mr-1 flex-shrink-0">
+              <span className="flex items-center gap-1.5 mr-2 flex-shrink-0">
                 <span className="relative flex h-2 w-2">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-violet-400 opacity-75" />
                   <span className="relative inline-flex rounded-full h-2 w-2 bg-violet-500" />
                 </span>
-                <span className="text-[9.5px] text-violet-400/70 uppercase tracking-wider font-medium">Live</span>
+                <span className="text-[10px] text-violet-400 font-bold uppercase tracking-widest">Orchestration Feed</span>
               </span>
-              {agentEvents.slice(-6).map((ev, i) => (
-                <motion.div key={`${ev.agent}-${i}`}
-                  initial={{ opacity: 0, x: -6 }} animate={{ opacity: 1, x: 0 }}
-                  className={cn(
-                    "flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[10.5px] font-medium",
-                    ev.status === "thinking" ? "text-violet-400 border-violet-500/35 bg-violet-500/8" :
-                    ev.status === "done"     ? "text-emerald-400 border-emerald-500/25 bg-emerald-500/6" :
-                                               "text-red-400 border-red-500/20"
-                  )}>
-                  <span className={cn("w-1.5 h-1.5 rounded-full",
-                    ev.status === "thinking" ? "bg-violet-400 animate-pulse" :
-                    ev.status === "done"     ? "bg-emerald-400" : "bg-red-400"
-                  )} />
-                  {AGENTS.find(a => a.key === ev.agent)?.icon || "🤖"} {ev.message}
-                </motion.div>
-              ))}
+              
+              <div className="flex items-center gap-1.5 overflow-x-auto" style={{ scrollbarWidth: "none" }}>
+                {agentEvents.slice(-4).map((ev, i) => (
+                  <motion.div key={`${ev.agent}-${i}`}
+                    initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }}
+                    className={cn(
+                      "flex items-center gap-1.5 px-3 py-1 rounded-full border text-[11px] font-semibold whitespace-nowrap",
+                      ev.status === "thinking" ? "text-violet-400 border-violet-500/35 bg-violet-500/8" :
+                      ev.status === "done"     ? "text-emerald-400 border-emerald-500/25 bg-emerald-500/6" :
+                                                 "text-red-400 border-red-500/20"
+                    )}>
+                    <span className={cn("w-1.5 h-1.5 rounded-full",
+                      ev.status === "thinking" ? "bg-violet-400 animate-pulse" :
+                      ev.status === "done"     ? "bg-emerald-400" : "bg-red-400"
+                    )} />
+                    <span>{AGENTS.find(a => a.key === ev.agent)?.icon || "🤖"}</span>
+                    <span className="text-white/60 capitalize font-medium">{ev.agent}:</span>
+                    <span>{ev.message}</span>
+                  </motion.div>
+                ))}
+              </div>
             </motion.div>
           )}
         </AnimatePresence>
 
+        {/* Chat Message Window Area */}
         <div className="flex flex-1 min-h-0">
 
           <div className="flex-1 flex flex-col min-w-0">
 
-            <div className="flex-1 overflow-y-auto px-4 md:px-6 py-5 space-y-5"
-              style={{ scrollbarWidth: "thin", scrollbarColor: "rgba(255,255,255,0.07) transparent" }}>
+            <div className="flex-1 overflow-y-auto px-4 md:px-8 py-6 space-y-6"
+              style={{ scrollbarWidth: "thin", scrollbarColor: "rgba(255,255,255,0.06) transparent" }}>
 
               {!activeSession ? (
                 <ProjectDashboard
@@ -694,309 +788,381 @@ export default function WorkspacePage() {
                   activeRoadmap={activeRoadmap}
                 />
               ) : (
-                <>
+                <div className="max-w-4xl mx-auto w-full space-y-6">
+                  
                   {messages.length === 0 && !isStreaming && (
-                <div className="flex flex-col items-center justify-center h-full text-center gap-4 py-16">
-                  <motion.div initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
-                    className="text-5xl mb-1">✦</motion.div>
-                  <motion.h2 initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
-                    className="text-xl font-semibold text-white/70">What shall we build?</motion.h2>
-                  <motion.p initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}
-                    className="text-[13px] text-white/28 max-w-xs leading-relaxed">
-                    6 specialized AI agents will collaborate to research, architect, plan, critique and innovate.
-                  </motion.p>
-                  <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}
-                    className="grid grid-cols-2 gap-2 w-full max-w-sm mt-2">
-                    {[
-                      "Build an AI crop monitoring drone",
-                      "Design a RAG system architecture",
-                      "Create a SaaS authentication flow",
-                      "Plan a machine learning pipeline",
-                    ].map(s => (
-                      <button key={s} onClick={() => setInputValue(s)}
-                        className="px-3 py-2.5 bg-white/[0.03] border border-white/[0.07] rounded-xl text-[12px] text-white/45 hover:text-white/70 hover:bg-white/[0.06] hover:border-white/[0.13] transition-all text-left leading-snug">
-                        {s}
-                      </button>
-                    ))}
-                  </motion.div>
-                  <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 }}
-                    className="text-[10.5px] text-white/18 mt-2">
-                    Press <kbd className="bg-white/[0.06] border border-white/[0.1] px-1.5 py-0.5 rounded text-[9.5px] font-mono">⌘K</kbd> for command palette
-                  </motion.p>
-                </div>
-              )}
-
-              {messages.map((msg, idx) => (
-                <motion.div key={msg.id}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.2 }}
-                  className={cn("flex gap-3", msg.role === "user" ? "flex-row-reverse" : "")}>
-
-                  <div className={cn(
-                    "w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5",
-                    msg.role === "user"
-                      ? "bg-gradient-to-br from-violet-500 to-pink-500"
-                      : "bg-gradient-to-br from-indigo-600 to-violet-600"
-                  )}>
-                    {msg.role === "user" ? initials : "✦"}
-                  </div>
-
-                  <div className={cn("max-w-[78%] flex flex-col gap-2", msg.role === "user" ? "items-end" : "items-start")}>
-                    {(msg as any).input_mode === "voice" && (
-                      <span className="text-[10px] text-emerald-400 flex items-center gap-1">🎤 Voice input</span>
-                    )}
-
-                    <div className={cn(
-                      "px-4 py-3 text-[13px] leading-relaxed",
-                      msg.role === "user"
-                        ? "bg-violet-500/14 border border-violet-500/20 rounded-2xl rounded-tr-sm text-white/85"
-                        : "bg-white/[0.04] border border-white/[0.07] rounded-2xl rounded-tl-sm text-white/80"
-                    )}>
-                      {msg.role === "assistant" ? (
-                        <ReactMarkdown remarkPlugins={[remarkGfm]} components={{
-                          code: ({ className, children, ...props }: any) => {
-                            const inline = !className;
-                            return inline
-                              ? <code className="bg-white/10 px-1.5 py-0.5 rounded text-violet-300 text-[12px] font-mono" {...props}>{children}</code>
-                              : <pre className="bg-black/40 border border-white/[0.09] rounded-xl p-3 overflow-x-auto my-2 text-[12px]"><code className="font-mono text-white/70" {...props}>{children}</code></pre>;
-                          },
-                          h1: ({ children }: any) => <h1 className="text-[15px] font-bold text-white/90 mt-3 mb-2">{children}</h1>,
-                          h2: ({ children }: any) => <h2 className="text-[13.5px] font-semibold text-white/85 mt-3 mb-1.5 flex items-center gap-2">{children}</h2>,
-                          h3: ({ children }: any) => <h3 className="text-[13px] font-medium text-white/75 mt-2 mb-1">{children}</h3>,
-                          p:  ({ children }: any) => <p className="text-[13px] text-white/75 leading-relaxed mb-2">{children}</p>,
-                          ul: ({ children }: any) => <ul className="space-y-1 my-1.5 pl-4">{children}</ul>,
-                          ol: ({ children }: any) => <ol className="space-y-1 my-1.5 pl-4 list-decimal">{children}</ol>,
-                          li: ({ children }: any) => <li className="text-[12.5px] text-white/68 list-disc">{children}</li>,
-                          table: ({ children }: any) => <div className="overflow-x-auto my-2"><table className="w-full text-[11.5px] border-collapse">{children}</table></div>,
-                          th: ({ children }: any) => <th className="border border-white/10 px-2 py-1.5 text-white/60 font-semibold bg-white/[0.05] text-left">{children}</th>,
-                          td: ({ children }: any) => <td className="border border-white/[0.07] px-2 py-1.5 text-white/50">{children}</td>,
-                          blockquote: ({ children }: any) => <blockquote className="border-l-2 border-violet-500/50 pl-3 my-2 text-white/50 italic">{children}</blockquote>,
-                          strong: ({ children }: any) => <strong className="font-semibold text-white/85">{children}</strong>,
-                        }}>
-                          {msg.content || "⏳"}
-                        </ReactMarkdown>
-                      ) : msg.content}
-                    </div>
-
-                    {msg.role === "assistant" && msg.content && (
-                      <div className="flex items-center gap-2 px-1 text-white/40 hover:text-white/70 transition-colors">
-                        <button
-                          onClick={() => handleSpeak(msg.id, msg.content)}
-                          className={cn(
-                            "flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-[10px] font-medium border transition-all",
-                            speakingMessageId === msg.id
-                              ? "bg-violet-500/15 border-violet-500/35 text-violet-300 animate-pulse"
-                              : "bg-white/[0.03] border-white/[0.07] text-white/45 hover:border-white/[0.15] hover:bg-white/[0.06] hover:text-white/75"
-                          )}
-                          title={speakingMessageId === msg.id ? "Stop reading response" : "Read response aloud"}
-                        >
-                          <span>{speakingMessageId === msg.id ? "⏹️" : "🔊"}</span>
-                          <span>{speakingMessageId === msg.id ? "Stop" : "Speak Response"}</span>
-                        </button>
-                      </div>
-                    )}
-
-                    {msg.agent_outputs && Object.keys(msg.agent_outputs).length > 0 && (
-                      <div className="w-full space-y-1.5">
-                        {Object.entries(msg.agent_outputs).map(([agent, output]) => {
-                          const cfg      = AGENTS.find(a => a.key === agent);
-                          const key      = `${msg.id}-${agent}`;
-                          const isOpen   = expandedAgents.has(key);
-                          return (
-                            <div key={agent} className="bg-black/22 border border-white/[0.06] rounded-xl overflow-hidden">
-                              <button onClick={() => setExpandedAgents(prev => { const n = new Set(prev); n.has(key) ? n.delete(key) : n.add(key); return n; })}
-                                className="w-full flex items-center gap-2 px-3 py-2 hover:bg-white/[0.03] transition-all text-left">
-                                <span className="text-[11px]">{cfg?.icon || "🤖"}</span>
-                                <span className="text-[10.5px] font-semibold" style={{ color: cfg?.color || "#a5b4fc" }}>
-                                  {cfg?.label || agent} Agent
-                                </span>
-                                <span className="ml-auto text-[9px] text-white/22">{isOpen ? "▾ collapse" : "▸ expand"}</span>
-                              </button>
-                              <AnimatePresence>
-                                {isOpen && (
-                                  <motion.div initial={{ height: 0 }} animate={{ height: "auto" }} exit={{ height: 0 }} className="overflow-hidden">
-                                    <div className="px-3 pb-3">
-                                      <ReactMarkdown remarkPlugins={[remarkGfm]} components={{
-                                        p:  ({ children }: any) => <p className="text-[11.5px] text-white/48 leading-relaxed mb-1">{children}</p>,
-                                        li: ({ children }: any) => <li className="text-[11.5px] text-white/45 list-disc ml-3 mb-0.5">{children}</li>,
-                                        code: ({ children }: any) => <code className="text-[11px] font-mono text-violet-300/80 bg-white/8 px-1 rounded">{children}</code>,
-                                        strong: ({ children }: any) => <strong className="font-semibold text-white/60">{children}</strong>,
-                                      }}>{output as string}</ReactMarkdown>
-                                    </div>
-                                  </motion.div>
-                                )}
-                              </AnimatePresence>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                </motion.div>
-              ))}
-
-              {isStreaming && (
-                <div className="flex gap-3 mt-2">
-                  <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-indigo-600 to-violet-600 flex items-center justify-center text-xs font-bold flex-shrink-0 mt-1">✦</div>
-                  <div className="flex-1 max-w-sm">
-                    <motion.div
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="bg-white/[0.02] border border-white/[0.07] rounded-2xl p-4 backdrop-blur-md shadow-2xl relative overflow-hidden"
-                    >
-                      {/* Glow effect */}
-                      <div className="absolute -top-10 -right-10 w-28 h-28 bg-violet-500/10 rounded-full filter blur-xl" />
+                    <div className="flex flex-col items-center justify-center text-center gap-5 py-20 px-4">
+                      <motion.div 
+                        initial={{ scale: 0.8, opacity: 0 }} 
+                        animate={{ scale: 1, opacity: 1 }}
+                        transition={{ type: "spring", stiffness: 200, damping: 20 }}
+                        className="w-16 h-16 rounded-2xl bg-gradient-to-br from-violet-500/10 to-indigo-500/10 border border-violet-500/20 flex items-center justify-center text-3xl shadow-xl shadow-black/30">✦</motion.div>
                       
-                      <div className="flex items-center justify-between border-b border-white/[0.06] pb-2 mb-3">
-                        <div className="flex items-center gap-2">
-                          <span className="relative flex h-2 w-2">
-                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-violet-400 opacity-75" />
-                            <span className="relative inline-flex rounded-full h-2 w-2 bg-violet-500" />
-                          </span>
-                          <span className="text-[10.5px] font-semibold uppercase tracking-wider text-violet-400">Agent Activity Pipeline</span>
-                        </div>
-                        <span className="text-[9.5px] text-white/30 font-mono">Real-time</span>
+                      <div className="space-y-2">
+                        <motion.h2 initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
+                          className="text-2xl font-bold tracking-tight text-white/80">Command your AI Agent Team</motion.h2>
+                        <motion.p initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}
+                          className="text-[13px] text-white/30 max-w-sm mx-auto leading-relaxed">
+                          Your collaborative network of 6 specialized agents is ready to research, code, criticize, and draft.
+                        </motion.p>
                       </div>
 
-                      <div className="space-y-3">
-                        {AGENTS.map(agent => {
-                          const status = getAgentStatus(agent.key);
-                          const latestEvent = agentEvents.filter(e => e.agent === agent.key).slice(-1)[0];
-                          
-                          let statusLabel = `${agent.label} Agent Working...`;
-                          if (status === "idle") {
-                            statusLabel = `${agent.label} Agent Pending`;
-                          } else if (status === "error") {
-                            statusLabel = `${agent.label} Agent Error`;
-                          }
+                      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}
+                        className="grid grid-cols-1 md:grid-cols-2 gap-2.5 w-full max-w-lg mt-4">
+                        {[
+                          "Build an AI crop monitoring drone roadmap",
+                          "Design a RAG system architecture template",
+                          "Create a secure SaaS JWT authentication structure",
+                          "Plan a deployment pipeline in GitHub Actions",
+                        ].map(s => (
+                          <button key={s} onClick={() => setInputValue(s)}
+                            className="px-4 py-3 bg-[#0a0b12]/60 hover:bg-white/[0.03] border border-white/[0.06] hover:border-violet-500/25 rounded-xl text-[12px] text-white/45 hover:text-violet-200 transition-all text-left leading-relaxed shadow-sm hover:translate-y-[-1px]">
+                            <span className="text-violet-400 mr-1.5">✦</span> {s}
+                          </button>
+                        ))}
+                      </motion.div>
+                      
+                      <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 }}
+                        className="text-[10px] text-white/15">
+                        Tip: Open command utility overlay with <kbd className="bg-white/[0.04] border border-white/[0.08] px-1.5 py-0.5 rounded text-[9px] font-mono mx-1">⌘K</kbd>
+                      </motion.p>
+                    </div>
+                  )}
 
-                          return (
-                            <div key={agent.key} className="flex items-center justify-between text-[12px]">
-                              <div className="flex items-center gap-2 min-w-0 flex-1">
-                                <span className="text-sm flex-shrink-0">{agent.icon}</span>
-                                <div className="min-w-0 flex-1">
-                                  <span className={cn(
-                                    "font-medium transition-colors duration-300",
-                                    status === "thinking" ? "text-white" :
-                                    status === "done" ? "text-white/60" : "text-white/25"
-                                  )}>
-                                    {statusLabel}
+                  {messages.map((msg, idx) => (
+                    <motion.div key={msg.id}
+                      initial={{ opacity: 0, y: 12 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.25 }}
+                      className={cn("flex gap-4 md:gap-5 items-start", msg.role === "user" ? "flex-row-reverse" : "")}>
+
+                      {/* Avatar */}
+                      <div className={cn(
+                        "w-8 h-8 rounded-xl flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5 shadow-lg border",
+                        msg.role === "user"
+                          ? "bg-gradient-to-br from-violet-500 to-pink-500 border-violet-400/20"
+                          : "bg-[#0f111c] border-white/[0.06] text-violet-400"
+                      )}>
+                        {msg.role === "user" ? initials : "✦"}
+                      </div>
+
+                      {/* Message Content Bubble */}
+                      <div className={cn("max-w-[85%] flex flex-col gap-2.5", msg.role === "user" ? "items-end" : "items-start")}>
+                        
+                        {(msg as any).input_mode === "voice" && (
+                          <span className="text-[10px] text-emerald-400 font-semibold flex items-center gap-1.5 px-2 py-0.5 bg-emerald-500/8 border border-emerald-500/15 rounded-full">
+                            <span className="w-1 h-1 bg-emerald-400 rounded-full animate-ping" />
+                            🎤 Voice input
+                          </span>
+                        )}
+
+                        <div className={cn(
+                          "px-5 py-4 text-[13px] leading-relaxed shadow-xl",
+                          msg.role === "user"
+                            ? "bg-violet-600/10 border border-violet-500/20 rounded-2xl rounded-tr-sm text-white/80"
+                            : "bg-[#0b0c14]/40 border border-white/[0.06] rounded-2xl rounded-tl-sm text-white/80 backdrop-blur-sm"
+                        )}>
+                          {msg.role === "assistant" ? (
+                            <ReactMarkdown remarkPlugins={[remarkGfm]} components={{
+                              code: ({ className, children, ...props }: any) => {
+                                const inline = !className;
+                                const match = /language-(\w+)/.exec(className || "");
+                                const lang = match ? match[1] : "";
+                                const codeContent = String(children).replace(/\n$/, "");
+                                
+                                return inline
+                                  ? <code className="bg-white/10 px-1.5 py-0.5 rounded text-violet-300 text-[12px] font-mono" {...props}>{children}</code>
+                                  : <CodeBlock code={codeContent} language={lang} />;
+                              },
+                              h1: ({ children }: any) => <h1 className="text-[16px] font-bold text-white/90 mt-4 mb-2 pb-1 border-b border-white/5">{children}</h1>,
+                              h2: ({ children }: any) => <h2 className="text-[14.5px] font-bold text-white/85 mt-4 mb-2 flex items-center gap-2 text-violet-300">{children}</h2>,
+                              h3: ({ children }: any) => <h3 className="text-[13px] font-semibold text-white/80 mt-3 mb-1">{children}</h3>,
+                              p:  ({ children }: any) => <p className="text-[13px] text-white/70 leading-relaxed mb-3">{children}</p>,
+                              ul: ({ children }: any) => <ul className="space-y-1.5 my-2 pl-5 list-disc text-white/60">{children}</ul>,
+                              ol: ({ children }: any) => <ol className="space-y-1.5 my-2 pl-5 list-decimal text-white/60">{children}</ol>,
+                              li: ({ children }: any) => <li className="text-[12.5px] text-white/65">{children}</li>,
+                              table: ({ children }: any) => <div className="overflow-x-auto my-3 border border-white/5 rounded-xl"><table className="w-full text-[12px] border-collapse bg-white/[0.01]">{children}</table></div>,
+                              th: ({ children }: any) => <th className="border-b border-white/10 px-3 py-2 text-white/60 font-semibold bg-white/[0.03] text-left">{children}</th>,
+                              td: ({ children }: any) => <td className="border-b border-white/[0.05] px-3 py-2 text-white/50">{children}</td>,
+                              blockquote: ({ children }: any) => <blockquote className="border-l-3 border-violet-500 bg-violet-500/5 px-4 py-2 my-3 rounded-r-lg text-white/60 italic leading-relaxed">{children}</blockquote>,
+                              strong: ({ children }: any) => <strong className="font-bold text-white/85">{children}</strong>,
+                            }}>
+                              {msg.content || "⏳"}
+                            </ReactMarkdown>
+                          ) : (
+                            <p className="whitespace-pre-wrap">{msg.content}</p>
+                          )}
+                        </div>
+
+                        {/* Text to Speech controller panel */}
+                        {msg.role === "assistant" && msg.content && (
+                          <div className="flex items-center gap-2 px-1">
+                            <button
+                              onClick={() => handleSpeak(msg.id, msg.content)}
+                              className={cn(
+                                "flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-semibold border transition-all hover:scale-[0.98]",
+                                speakingMessageId === msg.id
+                                  ? "bg-violet-500/20 border-violet-500/40 text-violet-300 animate-pulse shadow-md shadow-violet-500/10"
+                                  : "bg-white/[0.02] border-white/[0.06] text-white/40 hover:border-white/[0.12] hover:bg-white/[0.04] hover:text-white/70"
+                              )}
+                              title={speakingMessageId === msg.id ? "Stop voice synthesis" : "Read response aloud"}
+                            >
+                              {speakingMessageId === msg.id ? (
+                                <>
+                                  <span className="flex items-center gap-0.5 h-2">
+                                    <span className="w-[1.5px] h-2 bg-violet-300 rounded animate-bounce [animation-delay:0.1s]" />
+                                    <span className="w-[1.5px] h-3 bg-violet-300 rounded animate-bounce [animation-delay:0.3s]" />
+                                    <span className="w-[1.5px] h-1.5 bg-violet-300 rounded animate-bounce [animation-delay:0.5s]" />
                                   </span>
-                                  {status === "thinking" && latestEvent?.message && (
-                                    <span className="text-[10px] text-violet-400 animate-pulse ml-2 font-normal truncate">
-                                      — {latestEvent.message}
+                                  <span>Speaking... (Click to stop)</span>
+                                </>
+                              ) : (
+                                <>
+                                  <span>🔊</span>
+                                  <span>Read Aloud</span>
+                                </>
+                              )}
+                            </button>
+                          </div>
+                        )}
+
+                        {/* Modular Agent Outputs Accordions */}
+                        {msg.agent_outputs && Object.keys(msg.agent_outputs).length > 0 && (
+                          <div className="w-full space-y-1.5 mt-1.5">
+                            {Object.entries(msg.agent_outputs).map(([agent, output]) => {
+                              const cfg      = AGENTS.find(a => a.key === agent);
+                              const key      = `${msg.id}-${agent}`;
+                              const isOpen   = expandedAgents.has(key);
+                              return (
+                                <div key={agent} className="bg-[#0b0c13]/70 border border-white/[0.05] rounded-xl overflow-hidden shadow-sm">
+                                  <button onClick={() => setExpandedAgents(prev => { const n = new Set(prev); n.has(key) ? n.delete(key) : n.add(key); return n; })}
+                                    className="w-full flex items-center gap-2.5 px-3.5 py-2 hover:bg-white/[0.02] transition-all text-left">
+                                    <span className="text-[12px]">{cfg?.icon || "🤖"}</span>
+                                    <span className="text-[11.5px] font-bold" style={{ color: cfg?.color || "#a5b4fc" }}>
+                                      {cfg?.label || agent} Agent Logs
                                     </span>
-                                  )}
+                                    <span className="ml-auto text-[10px] text-white/20 font-medium">{isOpen ? "Hide ▴" : "Show ▾"}</span>
+                                  </button>
+                                  
+                                  <AnimatePresence>
+                                    {isOpen && (
+                                      <motion.div 
+                                        initial={{ height: 0 }} 
+                                        animate={{ height: "auto" }} 
+                                        exit={{ height: 0 }} 
+                                        className="overflow-hidden bg-black/10 border-t border-white/[0.04]"
+                                      >
+                                        <div className="px-4 py-3 leading-relaxed text-[11.5px]">
+                                          <ReactMarkdown remarkPlugins={[remarkGfm]} components={{
+                                            p:  ({ children }: any) => <p className="text-white/50 mb-2 leading-relaxed">{children}</p>,
+                                            li: ({ children }: any) => <li className="text-white/50 list-disc ml-4 mb-1">{children}</li>,
+                                            code: ({ children }: any) => <code className="text-[11px] font-mono text-violet-300 bg-white/5 px-1 py-0.5 rounded border border-white/5">{children}</code>,
+                                            strong: ({ children }: any) => <strong className="font-semibold text-white/70">{children}</strong>,
+                                          }}>{output as string}</ReactMarkdown>
+                                        </div>
+                                      </motion.div>
+                                    )}
+                                  </AnimatePresence>
                                 </div>
-                              </div>
-                              
-                              <div className="flex items-center justify-center flex-shrink-0 ml-3">
-                                {status === "thinking" ? (
-                                  <div className="relative flex items-center justify-center w-5 h-5">
-                                    <div className="w-3.5 h-3.5 rounded-full border border-violet-500/30 border-t-violet-400 animate-spin" />
-                                  </div>
-                                ) : status === "done" ? (
-                                  <motion.span
-                                    initial={{ scale: 0 }}
-                                    animate={{ scale: 1 }}
-                                    className="text-emerald-400 font-bold text-[13px] leading-none"
-                                  >
-                                    ✓
-                                  </motion.span>
-                                ) : status === "error" ? (
-                                  <span className="text-red-400 font-bold">✕</span>
-                                ) : (
-                                  <span className="w-1.5 h-1.5 rounded-full bg-white/10" />
-                                )}
-                              </div>
-                            </div>
-                          );
-                        })}
+                              );
+                            })}
+                          </div>
+                        )}
                       </div>
                     </motion.div>
-                  </div>
+                  ))}
+
+                  {/* Realtime thinking pipeline checklist animation */}
+                  {isStreaming && (
+                    <div className="flex gap-4 md:gap-5 mt-4">
+                      <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 flex items-center justify-center text-xs font-bold flex-shrink-0 mt-1 border border-indigo-400/20 shadow-md">✦</div>
+                      <div className="flex-1 max-w-sm">
+                        <motion.div
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className="bg-[#0b0c13]/90 border border-violet-500/20 rounded-2xl p-4 backdrop-blur-md shadow-2xl relative overflow-hidden"
+                        >
+                          <div className="absolute -top-12 -right-12 w-28 h-28 bg-violet-500/10 rounded-full filter blur-xl animate-pulse" />
+                          
+                          <div className="flex items-center justify-between border-b border-white/[0.06] pb-2 mb-3">
+                            <div className="flex items-center gap-2">
+                              <span className="relative flex h-2 w-2">
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-violet-400 opacity-75" />
+                                <span className="relative inline-flex rounded-full h-2 w-2 bg-violet-500" />
+                              </span>
+                              <span className="text-[10px] font-bold uppercase tracking-wider text-violet-400">Agent Activity Pipeline</span>
+                            </div>
+                            <span className="text-[9px] text-white/30 font-mono">Running...</span>
+                          </div>
+
+                          <div className="space-y-2.5">
+                            {AGENTS.map(agent => {
+                              const status = getAgentStatus(agent.key);
+                              const latestEvent = agentEvents.filter(e => e.agent === agent.key).slice(-1)[0];
+                              
+                              let statusLabel = `${agent.label} Agent Working...`;
+                              if (status === "idle") {
+                                statusLabel = `${agent.label} Agent Idle`;
+                              } else if (status === "error") {
+                                statusLabel = `${agent.label} Agent Failure`;
+                              }
+
+                              return (
+                                <div key={agent.key} className="flex items-center justify-between text-[11.5px]">
+                                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                                    <span className="text-xs flex-shrink-0">{agent.icon}</span>
+                                    <div className="min-w-0 flex-1">
+                                      <span className={cn(
+                                        "font-medium transition-colors duration-300",
+                                        status === "thinking" ? "text-white font-semibold" :
+                                        status === "done" ? "text-white/50" : "text-white/20"
+                                      )}>
+                                        {statusLabel}
+                                      </span>
+                                      {status === "thinking" && latestEvent?.message && (
+                                        <span className="text-[9.5px] text-violet-400/80 animate-pulse ml-1.5 font-normal truncate inline-block">
+                                          — {latestEvent.message}
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                  
+                                  <div className="flex items-center justify-center flex-shrink-0 ml-3">
+                                    {status === "thinking" ? (
+                                      <div className="w-3.5 h-3.5 rounded-full border border-violet-500/25 border-t-violet-400 animate-spin" />
+                                    ) : status === "done" ? (
+                                      <span className="text-emerald-400 font-bold text-[12px]">✓</span>
+                                    ) : status === "error" ? (
+                                      <span className="text-red-400 font-bold">✕</span>
+                                    ) : (
+                                      <span className="w-1.5 h-1.5 rounded-full bg-white/5" />
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </motion.div>
+                      </div>
+                    </div>
+                  )}
+
                 </div>
-              )}
-                </>
               )}
 
               <div ref={messagesEndRef} />
             </div>
 
-            <div className="px-4 md:px-6 pb-4 pt-2 flex-shrink-0">
-              <div className={cn(
-                "flex items-end gap-2.5 bg-white/[0.04] border rounded-2xl px-4 py-3 transition-all",
-                isListening ? "border-red-500/35 ring-1 ring-red-500/10" :
-                isStreaming ? "border-violet-500/25" : "border-white/[0.09] focus-within:border-violet-500/35"
-              )}>
-                <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" />
-                <textarea ref={inputRef} value={inputValue}
-                  onChange={e => { setInputValue(e.target.value); e.target.style.height = "auto"; e.target.style.height = Math.min(e.target.scrollHeight, 120) + "px"; }}
-                  onKeyDown={handleKeyDown}
-                  placeholder={isListening ? "Listening... Speak now!" : !activeSession ? "Type a prompt to start a new chat in this project..." : "Ask the agents anything… (Enter to send, Shift+Enter for newline)"}
-                  rows={1} disabled={isStreaming}
-                  className="flex-1 bg-transparent outline-none text-[13px] text-white/80 placeholder-white/18 leading-relaxed resize-none min-h-[22px]"
-                  style={{ maxHeight: "120px" }}
-                />
-                <div className="flex items-center gap-1.5 flex-shrink-0 pb-0.5">
-                  <button
-                    onClick={() => fileInputRef.current?.click()}
-                    className="w-8 h-8 rounded-lg flex items-center justify-center text-sm transition-all border bg-white/[0.04] border-white/[0.09] text-white/32 hover:text-white/60"
-                    title="Attach file"
-                  >
-                    📎
-                  </button>
-                  <button onClick={toggleListening}
-                    className={cn("relative w-8 h-8 rounded-lg flex items-center justify-center text-sm transition-all border",
-                      isListening ? "bg-red-500/15 border-red-500/30 text-red-400" :
-                      isVoice ? "bg-emerald-500/15 border-emerald-500/30 text-emerald-400" :
-                      "bg-white/[0.04] border-white/[0.09] text-white/32 hover:text-white/60"
-                    )} title={isListening ? "Stop listening" : isVoice ? "Voice mode on" : "Enable voice mode"}>
-                    {isListening ? (
-                      <>
-                        <span className="absolute inset-0 rounded-lg bg-red-500/20 animate-ping" />
-                        <span className="z-10 animate-pulse text-[11px]">⏹️</span>
-                      </>
-                    ) : (
-                      "🎤"
+            {/* Bottom floating Command Prompt Input Panel */}
+            <div className="px-4 md:px-8 pb-5 pt-2 flex-shrink-0">
+              <div className="max-w-4xl mx-auto w-full">
+                
+                <div className={cn(
+                  "bg-[#0e1017]/90 border rounded-2xl p-3 transition-all backdrop-blur-xl shadow-2xl flex flex-col gap-2.5",
+                  isListening ? "border-red-500/40 ring-1 ring-red-500/10 bg-red-500/[0.01]" :
+                  isStreaming ? "border-violet-500/25" : "border-white/[0.08] focus-within:border-violet-500/40 focus-within:shadow-[0_8px_32px_rgba(139,92,246,0.05)]"
+                )}>
+                  
+                  {/* Mode Pill Bar */}
+                  <div className="flex items-center justify-between border-b border-white/[0.04] pb-2 text-[10px] text-white/20">
+                    <div className="flex items-center gap-2">
+                      <span className="px-2 py-0.5 rounded bg-violet-500/10 border border-violet-500/15 text-violet-400 font-semibold tracking-wider uppercase">Auto-Orchestrator</span>
+                      <span className="w-1 h-1 bg-white/10 rounded-full" />
+                      <span>Input routing mode active</span>
+                    </div>
+                    {inputValue.length > 0 && (
+                      <span className="font-mono text-white/15">{inputValue.length} characters</span>
                     )}
-                  </button>
-                  <button onClick={handleSend} disabled={isStreaming || !inputValue.trim()}
-                    className="w-8 h-8 rounded-lg bg-violet-600/25 border border-violet-500/30 text-violet-300 flex items-center justify-center text-sm hover:bg-violet-600/40 transition-all disabled:opacity-35 disabled:cursor-not-allowed font-bold">↑</button>
+                  </div>
+
+                  <div className="flex items-end gap-3">
+                    <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" />
+                    
+                    <textarea ref={inputRef} value={inputValue}
+                      onChange={e => { setInputValue(e.target.value); e.target.style.height = "auto"; e.target.style.height = Math.min(e.target.scrollHeight, 120) + "px"; }}
+                      onKeyDown={handleKeyDown}
+                      placeholder={isListening ? "Listening... Speak now!" : !activeSession ? "Type a prompt to start a new chat in this project..." : "Command the agent team..."}
+                      rows={1} disabled={isStreaming}
+                      className="flex-1 bg-transparent outline-none text-[13px] text-white/80 placeholder-white/20 leading-relaxed resize-none min-h-[22px] max-h-[120px]"
+                    />
+                    
+                    {/* Action button layout */}
+                    <div className="flex items-center gap-1.5 flex-shrink-0 pb-0.5">
+                      <button
+                        onClick={() => fileInputRef.current?.click()}
+                        className="w-8 h-8 rounded-lg flex items-center justify-center text-sm transition-all border border-white/[0.06] bg-white/[0.02] text-white/35 hover:text-white/70 hover:bg-white/[0.05]"
+                        title="Upload file (CSV, TXT, PDF, etc.)"
+                      >
+                        📎
+                      </button>
+                      
+                      <button onClick={toggleListening}
+                        className={cn("relative w-8 h-8 rounded-lg flex items-center justify-center text-sm transition-all border",
+                          isListening ? "bg-red-500/15 border-red-500/35 text-red-400 shadow-md shadow-red-500/10" :
+                          isVoice ? "bg-emerald-500/15 border-emerald-500/35 text-emerald-400" :
+                          "border-white/[0.06] bg-white/[0.02] text-white/35 hover:text-white/70 hover:bg-white/[0.05]"
+                        )} title={isListening ? "Stop voice listening" : "Enable microphone input"}>
+                        {isListening ? (
+                          <>
+                            <span className="absolute inset-0 rounded-lg bg-red-500/20 animate-ping" />
+                            <span className="z-10 animate-pulse text-[11px]">⏹️</span>
+                          </>
+                        ) : (
+                          "🎤"
+                        )}
+                      </button>
+                      
+                      <button onClick={handleSend} disabled={isStreaming || !inputValue.trim()}
+                        className="w-8 h-8 rounded-lg bg-violet-600 border border-violet-500 text-white flex items-center justify-center text-sm hover:bg-violet-500 transition-all disabled:opacity-20 disabled:cursor-not-allowed font-bold shadow-lg shadow-violet-500/10 hover:scale-[0.98]">
+                        ↑
+                      </button>
+                    </div>
+                  </div>
                 </div>
-              </div>
-              <div className="flex items-center justify-between mt-2 px-1">
-                <span className="text-[10px] text-white/15">6 agents · pgvector memory · SSE streaming</span>
-                <span className="text-[10px] text-white/15">⌘K commands</span>
+
+                <div className="flex items-center justify-between mt-2.5 px-2 text-[10px] text-white/15">
+                  <span className="flex items-center gap-1.5">
+                    <span>⚡ Multi-Agent Swarm</span>
+                    <span>·</span>
+                    <span>📁 RAG Context Embeddings</span>
+                    <span>·</span>
+                    <span>💬 SSE Streaming</span>
+                  </span>
+                  <span className="font-mono">⌘K Commands Panel</span>
+                </div>
               </div>
             </div>
           </div>
 
+          {/* Right Panel Utility Panels Drawer */}
           <AnimatePresence>
             {rightPanelOpen && (
               <motion.div
                 initial={{ width: 0, opacity: 0 }}
-                animate={{ width: 320, opacity: 1 }}
+                animate={{ width: 330, opacity: 1 }}
                 exit={{ width: 0, opacity: 0 }}
-                transition={{ type: "spring", stiffness: 320, damping: 32 }}
-                className="border-l border-white/[0.06] flex flex-col bg-[#0d0e16] overflow-hidden flex-shrink-0"
+                transition={{ type: "spring", stiffness: 350, damping: 35 }}
+                className="border-l border-white/[0.06] flex flex-col bg-[#08090f]/95 overflow-hidden flex-shrink-0 z-20 backdrop-blur-xl"
               >
+                {/* Header Switch Tabs */}
                 <div className="p-3.5 border-b border-white/[0.06] flex items-center justify-between flex-shrink-0">
-                  <div className="flex gap-1.5 overflow-x-auto" style={{ scrollbarWidth: "none" }}>
+                  <div className="flex gap-1 overflow-x-auto" style={{ scrollbarWidth: "none" }}>
                     {(["roadmap", "memory", "graph", "analytics"] as RightTab[]).map(tab => (
                       <button key={tab} onClick={() => setRightTab(tab)}
-                        className={cn("px-2 py-1 rounded-lg text-[10.5px] font-medium transition-all capitalize whitespace-nowrap",
-                          rightTab === tab ? "bg-violet-500/15 text-violet-300 border border-violet-500/25" : "text-white/28 hover:text-white/55"
+                        className={cn("px-2 py-1 rounded-lg text-[10.5px] font-bold transition-all capitalize whitespace-nowrap",
+                          rightTab === tab 
+                            ? "bg-violet-500/12 text-violet-300 border border-violet-500/20 shadow-sm" 
+                            : "text-white/25 hover:text-white/55 border border-transparent"
                         )}>
-                        {tab === "roadmap" ? "🗺️ Roadmap" : tab === "memory" ? "🧠 Memory" : tab === "graph" ? "🔀 Graph" : "📊 Analytics"}
+                        {tab === "roadmap" ? "🗺️ Roadmap" : tab === "memory" ? "🧠 Memory" : tab === "graph" ? "🔀 Graph" : "📊 Stats"}
                       </button>
                     ))}
                   </div>
-                  <button onClick={() => setRightPanelOpen(false)} className="w-6 h-6 rounded-lg flex items-center justify-center text-white/25 hover:text-white/55 hover:bg-white/[0.06] transition-all text-sm">✕</button>
+                  <button onClick={() => setRightPanelOpen(false)} className="w-7 h-7 rounded-lg flex items-center justify-center text-white/25 hover:text-white/60 hover:bg-white/[0.05] transition-all text-[11px] border border-transparent hover:border-white/[0.05]">✕</button>
                 </div>
 
-                <div className="flex-1 overflow-y-auto p-3.5" style={{ scrollbarWidth: "thin", scrollbarColor: "rgba(255,255,255,0.07) transparent" }}>
+                {/* Tab content bodies */}
+                <div className="flex-1 overflow-y-auto p-4" style={{ scrollbarWidth: "thin", scrollbarColor: "rgba(255,255,255,0.06) transparent" }}>
 
                   {rightTab === "roadmap" && (
                     activeRoadmap ? (
@@ -1008,12 +1174,12 @@ export default function WorkspacePage() {
                         isGenerating={isGeneratingRoadmap}
                       />
                     ) : (
-                      <div className="text-center py-14 px-3">
-                        <div className="text-3xl mb-3">🗺️</div>
-                        <div className="text-[12.5px] font-medium text-white/45 mb-2">No roadmap yet</div>
-                        <div className="text-[11.5px] text-white/25 leading-relaxed">Ask the agents to plan a project, or generate one here.</div>
-                        <Button onClick={handleGenerateRoadmap} disabled={isGeneratingRoadmap} className="mt-4">
-                          {isGeneratingRoadmap ? "Generating..." : "Generate Roadmap"}
+                      <div className="text-center py-16 px-4">
+                        <div className="text-4xl mb-4">🗺️</div>
+                        <h4 className="text-[13px] font-bold text-white/70 mb-1.5">No active roadmap</h4>
+                        <p className="text-[11px] text-white/25 leading-relaxed mb-4">Ask the agents to structure your timeline tasks, or generate one instantly below.</p>
+                        <Button onClick={handleGenerateRoadmap} disabled={isGeneratingRoadmap} className="w-full py-2 bg-violet-600 hover:bg-violet-500 text-white rounded-xl text-xs font-semibold shadow-md">
+                          {isGeneratingRoadmap ? "Compiling Roadmap..." : "Generate Checklist Roadmap"}
                         </Button>
                       </div>
                     )
@@ -1024,11 +1190,15 @@ export default function WorkspacePage() {
                   )}
 
                   {rightTab === "graph" && (
-                    <div className="space-y-3">
+                    <div className="space-y-4">
+                      <div className="border-b border-white/[0.05] pb-3">
+                        <h4 className="text-[12.5px] font-bold text-white/70">🔀 Agent Coordination Network</h4>
+                        <p className="text-[10.5px] text-white/25 leading-relaxed mt-1">Live data packet visual routing stream.</p>
+                      </div>
                       <AgentOrchestrationGraph agents={agentNodes} isActive={isStreaming} />
                       {!isStreaming && agentEvents.length === 0 && (
-                        <div className="text-center text-[11.5px] text-white/25 py-4">
-                          Send a message to see the agent orchestration graph.
+                        <div className="text-center text-[11px] text-white/20 py-6 border border-white/[0.05] bg-white/[0.01] rounded-xl font-medium">
+                          Pipeline waiting for message input...
                         </div>
                       )}
                     </div>
@@ -1036,10 +1206,10 @@ export default function WorkspacePage() {
 
                   {rightTab === "analytics" && (
                     <div className="space-y-5">
-                      <div className="border-b border-white/[0.06] pb-3">
-                        <h3 className="text-[13px] font-bold text-white/80">📊 Agent Invocation Analytics</h3>
-                        <p className="text-[11px] text-white/35 leading-relaxed mt-1">
-                          Useful for debugging system load and tracking multi-agent coordination.
+                      <div className="border-b border-white/[0.05] pb-3">
+                        <h4 className="text-[12.5px] font-bold text-white/70">📊 Swarm Usage Analytics</h4>
+                        <p className="text-[10.5px] text-white/25 leading-relaxed mt-1">
+                          Invocation counts and resource breakdown per agent.
                         </p>
                       </div>
 
@@ -1051,17 +1221,17 @@ export default function WorkspacePage() {
 
                           return (
                             <div key={agent.key} className="space-y-1.5">
-                              <div className="flex items-center justify-between text-[11.5px]">
+                              <div className="flex items-center justify-between text-[11px]">
                                 <div className="flex items-center gap-2">
-                                  <span className="text-sm">{agent.icon}</span>
-                                  <span className="font-semibold text-white/70">{agent.label} Agent</span>
+                                  <span className="text-xs">{agent.icon}</span>
+                                  <span className="font-semibold text-white/60">{agent.label} Agent</span>
                                 </div>
-                                <span className="font-mono text-violet-300 font-bold bg-violet-500/10 px-2 py-0.5 rounded">
-                                  {calls} {calls === 1 ? 'Call' : 'Calls'}
+                                <span className="font-mono text-violet-300 font-bold bg-violet-500/10 px-2 py-0.5 border border-violet-500/10 rounded">
+                                  {calls} {calls === 1 ? 'call' : 'calls'}
                                 </span>
                               </div>
                               
-                              <div className="h-2 w-full bg-white/[0.04] rounded-full overflow-hidden border border-white/[0.05]">
+                              <div className="h-1.5 w-full bg-white/[0.03] rounded-full overflow-hidden border border-white/[0.04]">
                                 <motion.div
                                   initial={{ width: 0 }}
                                   animate={{ width: `${percent}%` }}
@@ -1072,29 +1242,29 @@ export default function WorkspacePage() {
                               </div>
                               
                               <div className="flex justify-between text-[9px] text-white/20">
-                                <span>Usage share: {percent.toFixed(1)}%</span>
-                                <span>Active</span>
+                                <span>Allocation: {percent.toFixed(1)}%</span>
+                                <span>System Online</span>
                               </div>
                             </div>
                           );
                         })}
                       </div>
 
-                      <div className="bg-white/[0.02] border border-white/[0.06] rounded-xl p-3 space-y-2 mt-2">
-                        <div className="flex items-center gap-1.5 text-[11px] font-bold text-white/50">
-                          <span>🛠️</span>
-                          <span>Orchestrator Stats Summary</span>
+                      <div className="bg-[#0b0c13]/55 border border-white/[0.05] rounded-xl p-3.5 space-y-2 mt-2">
+                        <div className="flex items-center gap-1.5 text-[11.5px] font-bold text-white/40 border-b border-white/[0.04] pb-1.5 mb-1.5">
+                          <span>⚙️</span>
+                          <span>Lifetime Run Profile</span>
                         </div>
-                        <div className="grid grid-cols-2 gap-2 text-[10.5px] font-mono">
-                          <div className="bg-white/[0.02] p-2 rounded border border-white/[0.04]">
-                            <p className="text-white/25">Total Calls</p>
-                            <p className="text-[14px] font-bold text-white/80 mt-0.5">
+                        <div className="grid grid-cols-2 gap-2 text-[10px] font-mono">
+                          <div className="bg-white/[0.01] p-2.5 rounded border border-white/[0.04]">
+                            <p className="text-white/20">Total Invokes</p>
+                            <p className="text-[15px] font-bold text-white/80 mt-0.5">
                               {Object.values(agentUsageStats).reduce((a, b) => a + b, 0)}
                             </p>
                           </div>
-                          <div className="bg-white/[0.02] p-2 rounded border border-white/[0.04]">
-                            <p className="text-white/25">Most Active</p>
-                            <p className="text-[14px] font-bold text-emerald-400 mt-0.5 truncate">
+                          <div className="bg-white/[0.01] p-2.5 rounded border border-white/[0.04]">
+                            <p className="text-white/20">Active Driver</p>
+                            <p className="text-[12.5px] font-bold text-emerald-400 mt-1 truncate">
                               {(() => {
                                 let maxCalls = -1;
                                 let activeAgent = "None";
@@ -1118,12 +1288,12 @@ export default function WorkspacePage() {
                             const resetVal = { qa: 0, research: 0, engineering: 0, planner: 0, critic: 0, innovation: 0 };
                             localStorage.setItem(`agent_usage_baseline_${projectId}`, JSON.stringify(resetVal));
                             setAgentUsageStats(resetVal);
-                            toast.success("Usage stats reset successfully.");
+                            toast.success("Usage counters reset.");
                           }
                         }}
-                        className="w-full text-center text-[10.5px] py-2 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 hover:text-red-300 transition-all font-medium mt-4"
+                        className="w-full text-center text-[10.5px] py-2 rounded-xl bg-red-500/10 border border-red-500/15 text-red-400 hover:bg-red-500/20 transition-all font-semibold mt-4"
                       >
-                        Reset Baseline Counters
+                        Reset Swarm Baselines
                       </button>
                     </div>
                   )}
@@ -1136,4 +1306,3 @@ export default function WorkspacePage() {
     </div>
   );
 }
-
