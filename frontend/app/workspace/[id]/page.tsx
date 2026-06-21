@@ -20,7 +20,7 @@ import {
   useCreateSession, useDeleteSession, useRenameSession,
 } from "@/hooks/useProjects";
 import { useChat } from "@/hooks/useChat";
-import { getRoadmap, generateRoadmap, updateRoadmapTask, deleteRoadmap } from "@/services/projectService";
+import { getRoadmap, generateRoadmap, updateRoadmapTask, deleteRoadmap, uploadProjectFile } from "@/services/projectService";
 import { cn } from "@/lib/utils";
 
 import { CommandPalette, useCommandPalette, type Command } from "@/components/ui/CommandPalette";
@@ -73,6 +73,7 @@ export default function WorkspacePage() {
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef       = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef   = useRef<HTMLInputElement>(null);
 
   // Data hooks
   const { data: projects  = [] } = useProjects();
@@ -81,7 +82,7 @@ export default function WorkspacePage() {
   const deleteSession            = useDeleteSession();
   const renameSession            = useRenameSession();
 
-  const { messages, agentEvents, isStreaming, sendMessage, setMessages } = useChat(projectId, activeSession?.id);
+  const { messages, agentEvents, isStreaming, sendMessage, setMessages } = useChat(projectId, activeSession?.id || null);
 
   // Command palette
   const { open: cmdOpen, setOpen: setCmdOpen } = useCommandPalette();
@@ -159,6 +160,26 @@ export default function WorkspacePage() {
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); }
+  };
+
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !projectId) return;
+
+    const toastId = toast.loading(`Uploading ${file.name}...`);
+
+    try {
+      await uploadProjectFile(projectId, file);
+      toast.success(`${file.name} uploaded and processed.`, { id: toastId });
+    } catch (error: any) {
+      console.error("File upload failed", error);
+      toast.error(`Failed to upload ${file.name}: ${error.response?.data?.detail || "Unknown error"}`, { id: toastId });
+    } finally {
+      // Reset file input
+      if(fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    }
   };
   
   const handleGenerateRoadmap = async () => {
@@ -608,6 +629,7 @@ export default function WorkspacePage() {
                 "flex items-end gap-2.5 bg-white/[0.04] border rounded-2xl px-4 py-3 transition-all",
                 isStreaming ? "border-violet-500/25" : "border-white/[0.09] focus-within:border-violet-500/35"
               )}>
+                <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" />
                 <textarea ref={inputRef} value={inputValue}
                   onChange={e => { setInputValue(e.target.value); e.target.style.height = "auto"; e.target.style.height = Math.min(e.target.scrollHeight, 120) + "px"; }}
                   onKeyDown={handleKeyDown}
@@ -617,6 +639,13 @@ export default function WorkspacePage() {
                   style={{ maxHeight: "120px" }}
                 />
                 <div className="flex items-center gap-1.5 flex-shrink-0 pb-0.5">
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    className="w-8 h-8 rounded-lg flex items-center justify-center text-sm transition-all border bg-white/[0.04] border-white/[0.09] text-white/32 hover:text-white/60"
+                    title="Attach file"
+                  >
+                    📎
+                  </button>
                   <button onClick={() => setIsVoice(p => !p)}
                     className={cn("w-8 h-8 rounded-lg flex items-center justify-center text-sm transition-all border",
                       isVoice ? "bg-emerald-500/15 border-emerald-500/30 text-emerald-400" : "bg-white/[0.04] border-white/[0.09] text-white/32 hover:text-white/60"

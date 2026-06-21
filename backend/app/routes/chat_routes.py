@@ -16,6 +16,7 @@ from app.auth.dependencies import get_current_user
 from app.database import crud
 from app.memory.session_memory import update_session_memory, get_or_create_session_memory
 from app.memory.user_memory import get_memory_context_for_prompt, save_session_to_memory
+from app.memory.file_memory import get_file_context_for_prompt
 from app.workflows.langgraph_flow import run_agent_pipeline
 
 router = APIRouter()
@@ -43,7 +44,12 @@ async def chat_stream(
 
     messages = await crud.get_messages_by_session(db, session_id)
     conversation_history = [{"role": m.role, "content": m.content} for m in messages[-10:]]
+    
+    # Get context from both user memory and uploaded files
     user_memory_context = await get_memory_context_for_prompt(db, user.id, body.message)
+    file_context = await get_file_context_for_prompt(db, project_id, body.message)
+    combined_context = f"{user_memory_context}\n\n{file_context}".strip()
+
 
     await crud.create_message(db, session_id=session_id, role="user", content=body.message)
 
@@ -63,7 +69,7 @@ async def chat_stream(
             async for sse_chunk in run_agent_pipeline(
                 user_message=body.message,
                 conversation_history=conversation_history,
-                user_memory_context=user_memory_context,
+                user_memory_context=combined_context,
                 user_id=str(user.id),
                 session_id=str(session_id),
                 project_id=str(project_id), # Pass project_id to the workflow

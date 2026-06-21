@@ -62,3 +62,16 @@ export async function updateRoadmapTask(projectId: string, taskId: string, compl
 export async function deleteRoadmap(projectId: string) {
   await api.delete(`/api/projects/${projectId}/roadmap`);
 }
+
+export async function uploadProjectFile(projectId: string, file: File) {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const r = await api.post(`/api/projects/${projectId}/files`, formData, {
+    headers: {
+      // Let browser set the multipart boundary automatically
+      // specifying Content-Type manually can break the request
+    },
+  });
+  return r.data;
+}

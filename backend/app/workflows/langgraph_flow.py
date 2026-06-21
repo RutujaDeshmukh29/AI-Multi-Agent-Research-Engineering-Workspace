@@ -113,36 +113,46 @@ async def node_parallel_dispatch(state: AgentState) -> AgentState:
                 state["user_memory_context"]
             )
             tasks.append(task)
+
+    # Parallel optimization: Run Planner's roadmap JSON generation in parallel with agent nodes
+    planner_json_task = None
+    if "planner" in agent_names_to_run:
+        emit(state, "planner", "thinking", "Generating interactive checklist...")
+        planner_json_task = planner_agent.generate_roadmap_json(
+            state["user_message"], state["conversation_history"]
+        )
+        tasks.append(planner_json_task)
             
     if tasks:
         results = await asyncio.gather(*tasks)
-        for agent_name, result in zip(agent_names_to_run, results):
+        
+        # Extract agent results (all tasks except the last one if it is the planner JSON task)
+        agent_results = results[:-1] if planner_json_task else results
+        for agent_name, result in zip(agent_names_to_run, agent_results):
             state[f"{agent_name}_output"] = result
             emit(state, agent_name, "done", f"{agent_name.title()} Agent complete ✓")
 
-    if "planner" in agent_names_to_run:
-        emit(state, "planner", "thinking", "Generating interactive checklist...")
-        rmap = await planner_agent.generate_roadmap_json(
-            state["user_message"], state["conversation_history"]
-        )
-        if rmap:
-            state["roadmap_json"] = rmap
-            emit(state, "planner", "done", "Roadmap + checklist created ✓")
-            
-            project_id = uuid.UUID(state.get("project_id"))
-            user_id = uuid.UUID(state.get("user_id"))
-            session_id = uuid.UUID(state.get("session_id"))
-            if project_id and user_id:
-                try:
-                    async with get_db_context() as db:
-                        await crud.create_or_update_roadmap(db, project_id, user_id, rmap, session_id)
-                    emit(state, "db", "done", "Roadmap saved to database.")
-                except Exception as e:
-                    logger.error("Failed to save roadmap in workflow", error=str(e))
-                    emit(state, "db", "error", "Failed to save roadmap.")
-        else:
-            state["roadmap_json"] = {}
-            emit(state, "planner", "error", "Failed to generate roadmap JSON.")
+        # Process the planner JSON result if it was generated
+        if planner_json_task:
+            rmap = results[-1]
+            if rmap:
+                state["roadmap_json"] = rmap
+                emit(state, "planner", "done", "Roadmap + checklist created ✓")
+                
+                project_id = uuid.UUID(state.get("project_id"))
+                user_id = uuid.UUID(state.get("user_id"))
+                session_id = uuid.UUID(state.get("session_id"))
+                if project_id and user_id:
+                    try:
+                        async with get_db_context() as db:
+                            await crud.create_or_update_roadmap(db, project_id, user_id, rmap, session_id)
+                        emit(state, "db", "done", "Roadmap saved to database.")
+                    except Exception as e:
+                        logger.error("Failed to save roadmap in workflow", error=str(e))
+                        emit(state, "db", "error", "Failed to save roadmap.")
+            else:
+                state["roadmap_json"] = {}
+                emit(state, "planner", "error", "Failed to generate roadmap JSON.")
 
     return state
 
@@ -233,11 +243,18 @@ async def run_agent_pipeline(
     try:
         graph = get_graph()
         
-        final_state = await graph.ainvoke(initial_state)
-
-        for ev in (final_state.get("agent_events") or []):
-            yield f"data: {json.dumps(ev)}\n\n"
-            await asyncio.sleep(0.04)
+        # Optimized live event streaming: stream node updates to the frontend immediately as they finish
+        yielded_events_count = 0
+        final_state = initial_state
+        
+        async for state_chunk in graph.astream(initial_state, stream_mode="values"):
+            final_state = state_chunk
+            events = state_chunk.get("agent_events") or []
+            while yielded_events_count < len(events):
+                ev = events[yielded_events_count]
+                yield f"data: {json.dumps(ev)}\n\n"
+                yielded_events_count += 1
+                await asyncio.sleep(0.01)
 
         outputs = {k.replace("_output",""): v for k, v in final_state.items() if k.endswith("_output") and v}
         final_data = {

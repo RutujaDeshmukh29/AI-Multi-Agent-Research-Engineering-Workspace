@@ -4,16 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/Button";
 
-interface RoadmapTask {
-  id: string;
-  title: string;
-  completed: boolean;
-  priority: "high" | "medium" | "low";
-  estimated_hours: number;
-  description?: string;
-  tags?: string[];
-  phase_index: number;
-}
+import { Roadmap, RoadmapTask } from "@/types";
 
 interface RoadmapPhase {
   id: string;
@@ -23,22 +14,12 @@ interface RoadmapPhase {
   week_end: number;
 }
 
-interface RoadmapData {
-  id: string;
-  project_title: string;
-  total_phases: number;
-  estimated_weeks: number;
-  progress_percent: number;
-  phases: RoadmapPhase[];
-  tasks: RoadmapTask[];
-}
-
 interface RoadmapPanelProps {
-  roadmap: RoadmapData;
+  roadmap: Roadmap;
   onTaskToggle: (taskId: string, completed: boolean) => Promise<void>;
-  onRegenerate: () => Promise<void>;
-  onDelete: () => Promise<void>;
-  isGenerating: boolean;
+  onRegenerate?: () => Promise<void>;
+  onDelete?: () => Promise<void>;
+  isGenerating?: boolean;
 }
 
 const PRIORITY_STYLES = {
@@ -50,7 +31,8 @@ const PRIORITY_STYLES = {
 const PHASE_COLORS = ["#6366f1", "#8b5cf6", "#06b6d4", "#10b981", "#f59e0b"];
 
 export function RoadmapPanel({ roadmap, onTaskToggle, onRegenerate, onDelete, isGenerating }: RoadmapPanelProps) {
-  const [expandedPhases, setExpandedPhases] = useState<Set<number>>(new Set((roadmap.phases || []).map((_, i) => i)));
+  const phases = ((roadmap as any).phases || roadmap.phases_json || []) as RoadmapPhase[];
+  const [expandedPhases, setExpandedPhases] = useState<Set<number>>(new Set(phases.map((_: any, i: number) => i)));
   const [loadingTasks, setLoadingTasks] = useState<Set<string>>(new Set());
 
   const togglePhase = (idx: number) => {
@@ -111,7 +93,7 @@ export function RoadmapPanel({ roadmap, onTaskToggle, onRegenerate, onDelete, is
       </div>
 
       <div className="divide-y divide-white/5">
-        {(roadmap.phases || []).map((phase, phaseIdx) => {
+        {phases.map((phase: RoadmapPhase, phaseIdx: number) => {
           const phaseTasks = tasksByPhase[phaseIdx] || [];
           const doneInPhase = phaseTasks.filter(t => t.completed).length;
           const phaseColor = PHASE_COLORS[phaseIdx % PHASE_COLORS.length];
@@ -153,7 +135,7 @@ export function RoadmapPanel({ roadmap, onTaskToggle, onRegenerate, onDelete, is
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 flex-wrap">
                               <span className={cn("text-xs font-medium", task.completed ? "line-through text-white/35" : "text-white/75")}>{task.title}</span>
-                              <span className={cn("text-[9px] px-1.5 py-0.5 rounded-full border font-medium", PRIORITY_STYLES[task.priority])}>{task.priority}</span>
+                              <span className={cn("text-[9px] px-1.5 py-0.5 rounded-full border font-medium", PRIORITY_STYLES[(task.priority as keyof typeof PRIORITY_STYLES) || 'medium'])}>{task.priority || 'medium'}</span>
                               <span className="text-[9px] text-white/25">~{task.estimated_hours}h</span>
                             </div>
                             {task.description && <p className="text-[10px] text-white/30 mt-0.5 leading-relaxed">{task.description}</p>}
@@ -173,12 +155,14 @@ export function RoadmapPanel({ roadmap, onTaskToggle, onRegenerate, onDelete, is
           );
         })}
       </div>
-      <div className="p-3 flex justify-end gap-2 border-t border-white/6 bg-black/10">
-        <Button onClick={onDelete} variant="destructive" size="sm" disabled={isGenerating}>Delete</Button>
-        <Button onClick={onRegenerate} variant="secondary" size="sm" disabled={isGenerating}>
-          {isGenerating ? "Generating..." : "Regenerate"}
-        </Button>
-      </div>
+      {onDelete && onRegenerate && (
+        <div className="p-3 flex justify-end gap-2 border-t border-white/6 bg-black/10">
+          <Button onClick={onDelete} className="bg-red-600 hover:bg-red-700 text-white h-8 px-3 rounded-md text-xs font-semibold" disabled={isGenerating}>Delete</Button>
+          <Button onClick={onRegenerate} className="bg-white/10 hover:bg-white/20 text-white h-8 px-3 rounded-md text-xs font-semibold" disabled={isGenerating}>
+            {isGenerating ? "Generating..." : "Regenerate"}
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

@@ -13,9 +13,9 @@ const API_BASE_URL =
 export const api = axios.create({
   baseURL: API_BASE_URL,
   timeout: 120000,
-  headers: {
-    "Content-Type": "application/json",
-  },
+  // Do not set a global Content-Type header here because some
+  // requests (e.g. FormData file uploads) need the browser to
+  // set the multipart boundary automatically.
 });
 
 // --- Request Interceptor: Attach JWT token ---

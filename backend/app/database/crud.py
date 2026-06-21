@@ -15,7 +15,7 @@ from typing import Optional
 import uuid
 from datetime import datetime, timezone
 
-from app.database.models import User, Project, Session, Message, UserMemory, SessionMemory, ProjectRoadmap, RoadmapTask
+from app.database.models import User, Project, Session, Message, UserMemory, SessionMemory, ProjectRoadmap, RoadmapTask, ProjectFile, FileChunk
 
 
 # ─────────────────────────────────────────
@@ -308,3 +308,57 @@ async def delete_roadmap(db: AsyncSession, project_id: uuid.UUID, user_id: uuid.
     await db.delete(roadmap)
     await db.flush()
     return True
+
+
+# ─────────────────────────────────────────
+# FILE CRUD
+# ─────────────────────────────────────────
+
+async def create_project_file(db: AsyncSession, project_id: uuid.UUID, user_id: uuid.UUID, file_name: str, file_path: str, file_type: str, file_size: int) -> ProjectFile:
+    """Create a record for an uploaded file."""
+    db_file = ProjectFile(
+        project_id=project_id,
+        user_id=user_id,
+        file_name=file_name,
+        file_path=file_path,
+        file_type=file_type,
+        file_size=file_size,
+        status="pending"
+    )
+    db.add(db_file)
+    await db.flush()
+    await db.refresh(db_file)
+    return db_file
+
+async def update_file_status(db: AsyncSession, file_id: uuid.UUID, status: str) -> None:
+    """Update the processing status of a file."""
+    await db.execute(
+        update(ProjectFile)
+        .where(ProjectFile.id == file_id)
+        .values(status=status)
+    )
+    await db.flush()
+
+async def create_file_chunk(db: AsyncSession, file_id: uuid.UUID, content: str, embedding: list[float], chunk_index: int, page_number: Optional[int] = None) -> FileChunk:
+    """Store a chunk of a file with its embedding."""
+    db_chunk = FileChunk(
+        file_id=file_id,
+        content=content,
+        embedding=embedding,
+        chunk_index=chunk_index,
+        page_number=page_number
+    )
+    db.add(db_chunk)
+    await db.flush()
+    await db.refresh(db_chunk)
+    return db_chunk
+
+async def get_file_chunks_for_project(db: AsyncSession, project_id: uuid.UUID) -> list[FileChunk]:
+    """Retrieve all file chunks for a given project."""
+    result = await db.execute(
+        select(FileChunk)
+        .join(ProjectFile)
+        .where(ProjectFile.project_id == project_id, ProjectFile.status == "completed")
+    )
+    return list(result.scalars().all())
+

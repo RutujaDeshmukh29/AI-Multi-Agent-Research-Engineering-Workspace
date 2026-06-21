@@ -38,6 +38,8 @@ export interface RoadmapTask {
     tags?: string[];
     completed: boolean;
     completed_at?: string;
+    phase_index: number;
+    task_index: number;
 }
 
 export interface Roadmap {
@@ -51,4 +53,28 @@ export interface Roadmap {
     tasks: RoadmapTask[];
     created_at: string;
     updated_at: string;
+}
+
+export interface User {
+  id: string;
+  email: string;
+  name: string;
+  avatar_url?: string;
+  created_at?: string;
+}
+
+export interface AuthTokens {
+  access_token: string;
+  refresh_token: string;
+}
+
+export interface LoginRequest {
+  email: string;
+  password: string;
+}
+
+export interface SignupRequest {
+  email: string;
+  password: string;
+  name: string;
 }

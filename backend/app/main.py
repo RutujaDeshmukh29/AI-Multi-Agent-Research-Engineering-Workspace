@@ -46,9 +46,11 @@ from app.routes.project_routes import router as project_router
 from app.routes.user_routes    import router as user_router
 from app.routes.voice_routes   import router as voice_router
 from app.routes.chat_routes    import router as chat_router
+from app.routes.file_routes    import router as file_router
 
 app.include_router(auth_router,    prefix="/api/auth",     tags=["Auth"])
 app.include_router(project_router, prefix="/api/projects", tags=["Projects"])
+app.include_router(file_router,    prefix="/api",          tags=["Files"])
 app.include_router(user_router,    prefix="/api/users",    tags=["Users"])
 app.include_router(voice_router,   prefix="/api/voice",    tags=["Voice"])
 app.include_router(chat_router,    prefix="/api/chat",     tags=["Chat"])

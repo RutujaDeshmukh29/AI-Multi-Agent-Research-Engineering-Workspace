@@ -89,6 +89,7 @@ class Project(Base):
     # Relationships
     user     = relationship("User",    back_populates="projects")
     sessions = relationship("Session", back_populates="project", cascade="all, delete-orphan")
+    files    = relationship("ProjectFile", back_populates="project", cascade="all, delete-orphan")
 
     def __repr__(self):
         return f"<Project {self.name}>"
@@ -369,3 +370,57 @@ class RoadmapTask(Base):
     completed_at   = Column(DateTime(timezone=True), nullable=True)
 
     roadmap = relationship("ProjectRoadmap", back_populates="tasks")
+
+
+# ─────────────────────────────────────────
+# PROJECT FILE — for knowledge uploads
+# ─────────────────────────────────────────
+class ProjectFile(Base):
+    __tablename__ = "project_files"
+
+    id         = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    project_id = Column(UUID(as_uuid=True), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id    = Column(UUID(as_uuid=True), ForeignKey("users.id",    ondelete="CASCADE"), nullable=False)
+    
+    file_name  = Column(String(255), nullable=False)
+    file_path  = Column(String(1024), nullable=False) # Relative path to file
+    file_type  = Column(String(50), nullable=True) # e.g. 'application/pdf'
+    file_size  = Column(Integer, nullable=True) # in bytes
+
+    status     = Column(String(50), default="pending") # pending -> processing -> completed -> error
+
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now(), server_default=func.now())
+
+    # Relationships
+    project = relationship("Project", back_populates="files")
+    chunks  = relationship("FileChunk", back_populates="file", cascade="all, delete-orphan")
+
+    def __repr__(self):
+        return f"<ProjectFile {self.file_name} project={self.project_id}>"
+
+# ─────────────────────────────────────────
+# FILE CHUNK — text chunks with embeddings
+# ─────────────────────────────────────────
+class FileChunk(Base):
+    __tablename__ = "file_chunks"
+
+    id         = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    file_id    = Column(UUID(as_uuid=True), ForeignKey("project_files.id", ondelete="CASCADE"), nullable=False, index=True)
+    
+    content    = Column(Text, nullable=False)
+    embedding  = Column(Vector(settings.EMBEDDING_DIMENSIONS), nullable=True)
+    
+    chunk_index = Column(Integer, nullable=False)
+    page_number = Column(Integer, nullable=True) # for PDFs
+
+    metadata_ = Column("metadata", JSON, nullable=True)
+
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    # Relationships
+    file = relationship("ProjectFile", back_populates="chunks")
+
+    def __repr__(self):
+        return f"<FileChunk index={self.chunk_index} file_id={self.file_id}>"
+
