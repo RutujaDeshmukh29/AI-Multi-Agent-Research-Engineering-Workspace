@@ -419,7 +419,7 @@ export function ProjectDashboard({
           {/* Files List Preview */}
           <div className="bg-white/[0.02] border border-white/[0.06] rounded-3xl p-5 space-y-3.5 backdrop-blur-md">
             <span className="text-[9.5px] font-bold uppercase tracking-widest text-white/30 block">Workspace Documents</span>
-            <div className="space-y-2 max-h-48 overflow-y-auto" style={{ scrollbarWidth: "thin" }}>
+            <div className="space-y-2">
               {files.map((file: any) => (
                 <div key={file.id} className="flex items-center justify-between p-2.5 bg-white/[0.01] border border-white/[0.04] rounded-xl hover:border-white/[0.08] transition-all">
                   <div className="min-w-0 flex-1">
@@ -468,7 +468,7 @@ export function ProjectDashboard({
                 <span className="text-[10px] text-white/35">Fetching summary metadata...</span>
               </div>
             ) : summary ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-96 overflow-y-auto pr-1" style={{ scrollbarWidth: "thin" }}>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pr-1">
                 {[
                   { title: "🎯 Scope & Goals", value: summary.goals },
                   { title: "🛠️ System Architecture", value: summary.architecture },

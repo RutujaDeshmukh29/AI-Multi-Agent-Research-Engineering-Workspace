@@ -451,7 +451,7 @@ export default function WorkspacePage() {
   ];
 
   return (
-    <div className="fixed inset-0 flex bg-[#06070d] text-white overflow-hidden font-sans antialiased">
+    <div className="h-screen w-screen flex bg-[#06070d] text-white overflow-hidden font-sans antialiased relative">
       
       {/* Background Gradients & Ambient Glow */}
       <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-violet-600/10 rounded-full blur-[160px] pointer-events-none z-0" />
@@ -470,7 +470,7 @@ export default function WorkspacePage() {
             animate={{ x: 0, opacity: 1 }}
             exit={{ x: -230, opacity: 0 }}
             transition={{ type: "spring", stiffness: 350, damping: 35 }}
-            className="w-[230px] flex-shrink-0 bg-[#0a0b12]/95 border-r border-white/[0.06] flex flex-col z-20 backdrop-blur-xl"
+            className="w-[230px] flex-shrink-0 bg-[#0a0b12]/95 border-r border-white/[0.06] flex flex-col z-20 backdrop-blur-xl h-screen overflow-hidden sticky top-0"
           >
             {/* Sidebar Header */}
             <div className="p-4 border-b border-white/[0.06] flex flex-col gap-3">
@@ -645,7 +645,7 @@ export default function WorkspacePage() {
       </AnimatePresence>
 
       {/* Main Workspace Workspace Content */}
-      <div className="flex-1 h-full flex flex-col min-w-0 z-10 relative">
+      <div className="flex-1 h-screen flex flex-col min-w-0 overflow-hidden z-10 relative">
 
         {/* Workspace Top Bar Header */}
         <div className="h-14 border-b border-white/[0.06] flex items-center justify-between px-4 md:px-5 gap-3 bg-[#06070d]/75 backdrop-blur-md z-10">
@@ -770,9 +770,9 @@ export default function WorkspacePage() {
         </AnimatePresence>
 
         {/* Chat Message Window Area */}
-        <div className="flex flex-1 min-h-0">
+        <div className="flex flex-1 min-h-0 overflow-hidden">
 
-          <div className="flex-1 flex flex-col min-w-0">
+          <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
 
             <div className="flex-1 overflow-y-auto px-4 md:px-8 py-6 space-y-6"
               style={{ scrollbarWidth: "thin", scrollbarColor: "rgba(255,255,255,0.06) transparent" }}>
@@ -1054,73 +1054,67 @@ export default function WorkspacePage() {
             </div>
 
             {/* Bottom Command Prompt Input Panel */}
-            <div className="w-full bg-[#07080e]/95 backdrop-blur-xl border-t border-white/[0.06] py-3.5 px-4 md:px-8 flex-shrink-0 z-10">
-              <div className="max-w-4xl mx-auto w-full">
+            <div className="w-full bg-[#0e1017]/90 backdrop-blur-xl border-t border-white/[0.08] py-4 px-4 md:px-8 flex-shrink-0 z-10">
+              <div className="max-w-4xl mx-auto w-full flex flex-col gap-3">
                 
-                <div className={cn(
-                  "bg-[#0e1017]/70 border border-white/[0.08] rounded-xl p-3 transition-all flex flex-col gap-2.5",
-                  isListening ? "border-red-500/40 ring-1 ring-red-500/10 bg-red-500/[0.01]" :
-                  isStreaming ? "border-violet-500/25" : "border-white/[0.08] focus-within:border-violet-500/40 focus-within:shadow-[0_8px_32px_rgba(139,92,246,0.05)]"
-                )}>
-                  
-                  {/* Mode Pill Bar */}
-                  <div className="flex items-center justify-between border-b border-white/[0.04] pb-2 text-[10px] text-white/20">
-                    <div className="flex items-center gap-2">
-                      <span className="px-2 py-0.5 rounded bg-violet-500/10 border border-violet-500/15 text-violet-400 font-semibold tracking-wider uppercase">Auto-Orchestrator</span>
-                      <span className="w-1 h-1 bg-white/10 rounded-full" />
-                      <span>Input routing mode active</span>
-                    </div>
-                    {inputValue.length > 0 && (
-                      <span className="font-mono text-white/15">{inputValue.length} characters</span>
-                    )}
+                {/* Mode Pill Bar */}
+                <div className="flex items-center justify-between border-b border-white/[0.04] pb-2 text-[10px] text-white/20">
+                  <div className="flex items-center gap-2">
+                    <span className="px-2 py-0.5 rounded bg-violet-500/10 border border-violet-500/15 text-violet-400 font-semibold tracking-wider uppercase">Auto-Orchestrator</span>
+                    <span className="w-1 h-1 bg-white/10 rounded-full" />
+                    <span>Input routing mode active</span>
                   </div>
+                  {inputValue.length > 0 && (
+                    <span className="font-mono text-white/15">{inputValue.length} characters</span>
+                  )}
+                </div>
 
-                  <div className="flex items-end gap-3">
-                    <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" />
+                <div className="flex items-end gap-3">
+                  <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" />
+                  
+                  <textarea ref={inputRef} value={inputValue}
+                    onChange={e => { setInputValue(e.target.value); e.target.style.height = "auto"; e.target.style.height = Math.min(e.target.scrollHeight, 120) + "px"; }}
+                    onKeyDown={handleKeyDown}
+                    placeholder={isListening ? "Listening... Speak now!" : !activeSession ? "Type a prompt to start a new chat in this project..." : "Command the agent team..."}
+                    rows={1} disabled={isStreaming}
+                    className="flex-1 bg-transparent outline-none text-[13px] text-white/80 placeholder-white/20 leading-relaxed resize-none min-h-[22px] max-h-[120px]"
+                  />
+                  
+                  {/* Action button layout */}
+                  <div className="flex items-center gap-1.5 flex-shrink-0 pb-0.5">
+                    <button
+                      onClick={() => fileInputRef.current?.click()}
+                      className="w-8 h-8 rounded-lg flex items-center justify-center text-sm transition-all border border-white/[0.06] bg-white/[0.02] text-white/35 hover:text-white/70 hover:bg-white/[0.05]"
+                      title="Upload file (CSV, TXT, PDF, etc.)"
+                    >
+                      📎
+                    </button>
                     
-                    <textarea ref={inputRef} value={inputValue}
-                      onChange={e => { setInputValue(e.target.value); e.target.style.height = "auto"; e.target.style.height = Math.min(e.target.scrollHeight, 120) + "px"; }}
-                      onKeyDown={handleKeyDown}
-                      placeholder={isListening ? "Listening... Speak now!" : !activeSession ? "Type a prompt to start a new chat in this project..." : "Command the agent team..."}
-                      rows={1} disabled={isStreaming}
-                      className="flex-1 bg-transparent outline-none text-[13px] text-white/80 placeholder-white/20 leading-relaxed resize-none min-h-[22px] max-h-[120px]"
-                    />
+                    <button onClick={toggleListening}
+                      className={cn("relative w-8 h-8 rounded-lg flex items-center justify-center text-sm transition-all border",
+                        isListening ? "bg-red-500/15 border-red-500/35 text-red-400 shadow-md shadow-red-500/10" :
+                        isVoice ? "bg-emerald-500/15 border-emerald-500/35 text-emerald-400" :
+                        "border-white/[0.06] bg-white/[0.02] text-white/35 hover:text-white/70 hover:bg-white/[0.05]"
+                      )} title={isListening ? "Stop voice listening" : "Enable microphone input"}>
+                      {isListening ? (
+                        <>
+                          <span className="absolute inset-0 rounded-lg bg-red-500/20 animate-ping" />
+                          <span className="z-10 animate-pulse text-[11px]">⏹️</span>
+                        </>
+                      ) : (
+                        "🎤"
+                      )}
+                    </button>
                     
-                    {/* Action button layout */}
-                    <div className="flex items-center gap-1.5 flex-shrink-0 pb-0.5">
-                      <button
-                        onClick={() => fileInputRef.current?.click()}
-                        className="w-8 h-8 rounded-lg flex items-center justify-center text-sm transition-all border border-white/[0.06] bg-white/[0.02] text-white/35 hover:text-white/70 hover:bg-white/[0.05]"
-                        title="Upload file (CSV, TXT, PDF, etc.)"
-                      >
-                        📎
-                      </button>
-                      
-                      <button onClick={toggleListening}
-                        className={cn("relative w-8 h-8 rounded-lg flex items-center justify-center text-sm transition-all border",
-                          isListening ? "bg-red-500/15 border-red-500/35 text-red-400 shadow-md shadow-red-500/10" :
-                          isVoice ? "bg-emerald-500/15 border-emerald-500/35 text-emerald-400" :
-                          "border-white/[0.06] bg-white/[0.02] text-white/35 hover:text-white/70 hover:bg-white/[0.05]"
-                        )} title={isListening ? "Stop voice listening" : "Enable microphone input"}>
-                        {isListening ? (
-                          <>
-                            <span className="absolute inset-0 rounded-lg bg-red-500/20 animate-ping" />
-                            <span className="z-10 animate-pulse text-[11px]">⏹️</span>
-                          </>
-                        ) : (
-                          "🎤"
-                        )}
-                      </button>
-                      
-                      <button onClick={handleSend} disabled={isStreaming || !inputValue.trim()}
-                        className="w-8 h-8 rounded-lg bg-violet-600 border border-violet-500 text-white flex items-center justify-center text-sm hover:bg-violet-500 transition-all disabled:opacity-20 disabled:cursor-not-allowed font-bold shadow-lg shadow-violet-500/10 hover:scale-[0.98]">
-                        ↑
-                      </button>
-                    </div>
+                    <button onClick={handleSend} disabled={isStreaming || !inputValue.trim()}
+                      className="w-8 h-8 rounded-lg bg-violet-600 border border-violet-500 text-white flex items-center justify-center text-sm hover:bg-violet-500 transition-all disabled:opacity-20 disabled:cursor-not-allowed font-bold shadow-lg shadow-violet-500/10 hover:scale-[0.98]">
+                      ↑
+                    </button>
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between mt-2.5 px-2 text-[10px] text-white/15">
+                {/* Swarm Details and commands description */}
+                <div className="flex items-center justify-between mt-1 px-2 text-[10px] text-white/15">
                   <span className="flex items-center gap-1.5">
                     <span>⚡ Multi-Agent Swarm</span>
                     <span>·</span>
@@ -1142,7 +1136,7 @@ export default function WorkspacePage() {
                 animate={{ width: 330, opacity: 1 }}
                 exit={{ width: 0, opacity: 0 }}
                 transition={{ type: "spring", stiffness: 350, damping: 35 }}
-                className="border-l border-white/[0.06] flex flex-col bg-[#08090f]/95 overflow-hidden flex-shrink-0 z-20 backdrop-blur-xl"
+                className="border-l border-white/[0.06] flex flex-col bg-[#08090f]/95 overflow-hidden flex-shrink-0 z-20 backdrop-blur-xl min-h-screen"
               >
                 {/* Header Switch Tabs */}
                 <div className="p-3.5 border-b border-white/[0.06] flex items-center justify-between flex-shrink-0">
