@@ -55,11 +55,11 @@ To view the raw image assets directly in this repository, visit the [assets/scre
 
 | Signup Page | Dashboard Page | Workspace Shell |
 |:---:|:---:|:---:|
-| ![Signup Page](assets/screenshots/signup v2.png) | ![Dashboard Page](assets/screenshots/dashboard-1 v2.png) | ![Workspace Shell](assets/screenshots/workspace-1 v2.png) |
+| ![Signup Page](assets/screenshots/signup%20v2.png) | ![Dashboard Page](assets/screenshots/dashboard-1%20v2.png) | ![Workspace Shell](assets/screenshots/workspace-1%20v2.png) |
 
 | Roadmap View | Profile Settings | Agent Orchestration Graph |
 |:---:|:---:|:---:|
-| ![Roadmap View](assets/screenshots/general chat v2.png) | ![Profile Settings](assets/screenshots/profile page v2.png) | ![Agent Orchestration](assets/screenshots/agent routing v2.png) |
+| ![Roadmap View](assets/screenshots/general%20chat%20v2.png) | ![Profile Settings](assets/screenshots/profile%20page%20v2.png) | ![Agent Orchestration](assets/screenshots/agent%20routing%20v2.png) |
 
 ---
 
