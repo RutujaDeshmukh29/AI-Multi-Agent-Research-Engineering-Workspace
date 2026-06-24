@@ -18,6 +18,29 @@ interface ProjectDashboardProps {
   activeRoadmap: any;
 }
 
+const containerVariants = {
+  hidden: { opacity: 0 },
+  show: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.05,
+    },
+  },
+};
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 15 },
+  show: {
+    opacity: 1,
+    y: 0,
+    transition: {
+      type: "spring",
+      stiffness: 300,
+      damping: 25,
+    },
+  },
+};
+
 export function ProjectDashboard({
   projectId,
   activeProject,
@@ -60,20 +83,20 @@ export function ProjectDashboard({
 
   // Deduce project status based on progress
   let projectStatus = "Planning";
-  let statusColor = "bg-sky-500/10 text-sky-400 border-sky-500/25";
+  let statusColor = "bg-sky-500/10 text-sky-300 border-sky-500/30";
   if (totalTasksCount > 0) {
     if (progressPercent === 100) {
       projectStatus = "Completed";
-      statusColor = "bg-emerald-500/10 text-emerald-400 border-emerald-500/25";
+      statusColor = "bg-emerald-500/10 text-emerald-300 border-emerald-500/30";
     } else if (progressPercent > 0) {
       projectStatus = "In Development";
-      statusColor = "bg-amber-500/10 text-amber-400 border-amber-500/25";
+      statusColor = "bg-amber-500/10 text-amber-300 border-amber-500/30";
     }
   }
 
   const panelClass =
-    "bg-slate-950/55 border border-white/[0.10] rounded-2xl backdrop-blur-xl shadow-[0_18px_55px_rgba(0,0,0,0.24)] transition-all duration-300 hover:-translate-y-0.5 hover:border-violet-300/25 hover:bg-slate-900/70 hover:shadow-[0_24px_70px_rgba(79,70,229,0.14)]";
-  const sectionLabelClass = "text-[9.5px] font-bold uppercase tracking-widest text-slate-300/75";
+    "bg-gradient-to-b from-[#131628]/60 to-[#0e101d]/75 border border-white/[0.08] rounded-2xl backdrop-blur-xl shadow-[0_12px_40px_rgba(0,0,0,0.3)] transition-all duration-300 hover:-translate-y-0.5 hover:border-violet-500/35 hover:shadow-[0_20px_50px_rgba(139,92,246,0.12)] hover:bg-[#131628]/85";
+  const sectionLabelClass = "text-[10px] font-bold uppercase tracking-widest text-violet-300/90";
 
   // Handle Summary Generation
   const handleGenerateSummary = async () => {
@@ -89,7 +112,6 @@ export function ProjectDashboard({
 
   // Compile full Project document (For Export)
   const buildProjectDocument = async (format: "markdown" | "json"): Promise<string> => {
-    // 1. Gather all session chats content
     const chatsData = [];
     for (const session of sessions) {
       try {
@@ -262,13 +284,16 @@ export function ProjectDashboard({
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 14 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.35, ease: "easeOut" }}
+      variants={containerVariants}
+      initial="hidden"
+      animate="show"
       className="min-h-full flex flex-col space-y-6 pb-4"
     >
       {/* Dashboard Top Header bar */}
-      <div className="relative overflow-hidden flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-gradient-to-br from-slate-900/82 via-[#14172a]/78 to-slate-950/74 border border-white/[0.12] rounded-2xl p-5 backdrop-blur-xl shadow-[0_22px_70px_rgba(0,0,0,0.25)]">
+      <motion.div
+        variants={itemVariants}
+        className="relative overflow-hidden flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-gradient-to-br from-[#1b1e35]/90 via-[#13162b]/85 to-[#0e101f]/90 border border-white/[0.15] rounded-2xl p-5 backdrop-blur-xl shadow-[0_22px_70px_rgba(99,102,241,0.06)]"
+      >
         <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-violet-300/45 to-transparent" />
         <div className="absolute -right-24 -top-24 h-48 w-48 rounded-full bg-violet-500/14 blur-3xl pointer-events-none" />
         <div>
@@ -276,7 +301,7 @@ export function ProjectDashboard({
             <span className="text-xl">{activeProject?.icon || "🧠"}</span>
             <h1 className="text-lg font-bold text-white">{activeProject?.name} Workspace</h1>
           </div>
-          <p className="text-xs text-slate-300/85 mt-1 max-w-xl line-clamp-2 leading-relaxed">
+          <p className="text-xs text-slate-200 mt-1.5 max-w-xl line-clamp-2 leading-relaxed font-medium">
             {activeProject?.description || "Collaborative multi-agent development space."}
           </p>
         </div>
@@ -340,64 +365,62 @@ export function ProjectDashboard({
             💬 Start Discussion
           </Button>
         </div>
-      </div>
+      </motion.div>
 
       {/* Dynamic Statistics Grid */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {/* Project Status */}
-        <div className={cn(panelClass, "p-4.5 space-y-1.5")}>
+        <motion.div variants={itemVariants} className={cn(panelClass, "p-5 space-y-1.5")}>
           <span className={sectionLabelClass}>Workspace Status</span>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 mt-1">
             <div className={cn("px-2.5 py-0.5 rounded-full text-[10px] font-bold border", statusColor)}>
               {projectStatus}
             </div>
           </div>
-        </div>
+        </motion.div>
 
         {/* Roadmap Progress */}
-        <div className={cn(panelClass, "p-4.5 space-y-2.5")}>
+        <motion.div variants={itemVariants} className={cn(panelClass, "p-5 space-y-2.5")}>
           <div className="flex justify-between items-center">
             <span className={sectionLabelClass}>Roadmap Progress</span>
-            <span className="text-[10px] text-white/80 font-bold font-mono">{progressPercent}%</span>
+            <span className="text-[10.5px] text-white font-bold font-mono">{progressPercent}%</span>
           </div>
           <div className="space-y-1">
             <div className="w-full h-1.5 rounded-full bg-white/[0.06] overflow-hidden">
               <div className="h-full bg-gradient-to-r from-violet-500 to-indigo-600 rounded-full transition-all duration-500" style={{ width: `${progressPercent}%` }} />
             </div>
-            <span className="text-[9px] text-slate-400 block">{completedTasksCount} / {totalTasksCount} tasks complete</span>
+            <span className="text-[10px] text-slate-300 block">{completedTasksCount} / {totalTasksCount} tasks complete</span>
           </div>
-        </div>
+        </motion.div>
 
         {/* Files Uploaded */}
-        <div className={cn(panelClass, "p-4.5 space-y-1")}>
+        <motion.div variants={itemVariants} className={cn(panelClass, "p-5 space-y-1")}>
           <span className={sectionLabelClass}>Knowledge Database</span>
-          <p className="text-xl font-black font-mono text-white">{files.length}</p>
-          <span className="text-[9.5px] text-slate-400 block">Uploaded files & documents</span>
-        </div>
+          <p className="text-2xl font-black font-mono text-white mt-1">{files.length}</p>
+          <span className="text-[10px] text-slate-300 block">Uploaded files & documents</span>
+        </motion.div>
 
         {/* Memories count */}
-        <div className={cn(panelClass, "p-4.5 space-y-1")}>
+        <motion.div variants={itemVariants} className={cn(panelClass, "p-5 space-y-1")}>
           <span className={sectionLabelClass}>Persistent Memory</span>
-          <div className="flex items-baseline gap-1.5">
-            <p className="text-xl font-black font-mono text-white">
+          <div className="flex items-baseline gap-1.5 mt-1">
+            <p className="text-2xl font-black font-mono text-white">
               {memoriesLoading ? "..." : memoriesCount}
             </p>
-            <span className="text-[10px] text-violet-400 font-bold">pgvector</span>
+            <span className="text-[10.5px] text-violet-400 font-bold uppercase tracking-wider">pgvector</span>
           </div>
-          <span className="text-[9.5px] text-slate-400 block">Cross-session learnings</span>
-        </div>
+          <span className="text-[10px] text-slate-300 block">Cross-session learnings</span>
+        </motion.div>
       </div>
 
       {/* Main Grid: Summary & Timeline */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
         {/* Project Timeline & Files Column (Left) */}
         <div className="lg:col-span-1 space-y-6">
-          
           {/* Visual Project Timeline */}
-          <div className={cn(panelClass, "rounded-3xl p-5 space-y-4.5")}>
+          <motion.div variants={itemVariants} className={cn(panelClass, "rounded-3xl p-5 space-y-4.5")}>
             <span className={cn(sectionLabelClass, "block")}>Project Milestone Path</span>
-            
+
             <div className="relative pl-6 space-y-6 border-l border-white/[0.08] ml-2 mt-2">
               {[
                 { phase: "Phase 1: Research", task: "Web indices lookup & Crawler setup", trigger: progressPercent >= 10 },
@@ -409,33 +432,33 @@ export function ProjectDashboard({
                 <div key={step.phase} className="relative">
                   {/* Timeline point */}
                   <div className={cn(
-                    "absolute -left-[31px] top-0.5 w-4 h-4 rounded-full flex items-center justify-center border-2 transition-all",
+                    "absolute -left-[31px] top-0.5 w-4 h-4 rounded-full flex items-center justify-center border-2 transition-all duration-300",
                     step.trigger 
-                      ? "bg-violet-600 border-violet-500 shadow-md shadow-violet-500/25" 
-                      : "bg-slate-950 border-white/[0.18]"
+                      ? "bg-violet-500 border-violet-400 shadow-[0_0_12px_rgba(139,92,246,0.4)]" 
+                      : "bg-[#0b0c15] border-white/[0.15]"
                   )}>
                     {step.trigger && <span className="text-[7.5px] text-white font-bold">✓</span>}
                   </div>
                   <div>
-                    <h4 className={cn("text-[11.5px] font-bold", step.trigger ? "text-white" : "text-slate-400")}>
+                    <h4 className={cn("text-[11.5px] font-semibold", step.trigger ? "text-white" : "text-slate-400/80")}>
                       {step.phase}
                     </h4>
-                    <p className="text-[9.5px] text-slate-400/85 mt-0.5">{step.task}</p>
+                    <p className="text-[10px] text-slate-300/90 mt-0.5">{step.task}</p>
                   </div>
                 </div>
               ))}
             </div>
-          </div>
+          </motion.div>
 
           {/* Files List Preview */}
-          <div className={cn(panelClass, "rounded-3xl p-5 space-y-3.5")}>
+          <motion.div variants={itemVariants} className={cn(panelClass, "rounded-3xl p-5 space-y-3.5")}>
             <span className={cn(sectionLabelClass, "block")}>Workspace Documents</span>
             <div className="space-y-2">
               {files.map((file: any) => (
-                <div key={file.id} className="flex items-center justify-between p-2.5 bg-white/[0.04] border border-white/[0.08] rounded-xl hover:border-violet-300/25 hover:bg-white/[0.07] transition-all">
+                <div key={file.id} className="flex items-center justify-between p-2.5 bg-white/[0.03] border border-white/[0.07] rounded-xl hover:border-violet-500/30 hover:bg-white/[0.05] hover:shadow-[0_4px_12px_rgba(0,0,0,0.15)] transition-all">
                   <div className="min-w-0 flex-1">
-                    <p className="text-[11px] font-mono text-white/85 truncate">{file.file_name}</p>
-                    <span className="text-[8.5px] text-slate-400 mt-0.5 block">
+                    <p className="text-[11.5px] font-mono text-white/90 truncate">{file.file_name}</p>
+                    <span className="text-[9.5px] text-slate-300 mt-0.5 block">
                       {(file.file_size / 1024).toFixed(1)} KB · {file.file_type?.split("/")[1] || "doc"}
                     </span>
                   </div>
@@ -453,15 +476,13 @@ export function ProjectDashboard({
                 <p className="text-[10px] text-white/20 italic text-center py-4">No documents uploaded. Click 📎 in chat to upload context files.</p>
               )}
             </div>
-          </div>
-
+          </motion.div>
         </div>
 
         {/* AI summary & Chats Section (Right Columns) */}
         <div className="lg:col-span-2 space-y-6">
-
           {/* AI Project Summary */}
-          <div className={cn(panelClass, "rounded-3xl p-5 space-y-4")}>
+          <motion.div variants={itemVariants} className={cn(panelClass, "rounded-3xl p-5 space-y-4")}>
             <div className="flex items-center justify-between border-b border-white/[0.08] pb-2.5">
               <span className="text-[9.5px] font-bold uppercase tracking-widest text-white/30">✨ AI Executive Project Summary</span>
               <button
@@ -488,15 +509,15 @@ export function ProjectDashboard({
                   { title: "⚡ Immediate Next Steps", value: summary.next_steps },
                   { title: "⚠️ Primary Risks & Blocks", value: summary.risks },
                 ].map((sec) => (
-                  <div key={sec.title} className="bg-white/[0.04] border border-white/[0.08] p-3 rounded-2xl space-y-1.5 hover:bg-white/[0.06] transition-colors">
-                    <h4 className="text-[11px] font-bold text-white/90">{sec.title}</h4>
-                    <p className="text-[11px] text-slate-300/85 leading-relaxed whitespace-pre-wrap">{sec.value}</p>
+                  <div key={sec.title} className="bg-[#14172a]/40 border border-white/[0.08] p-3.5 rounded-2xl space-y-1.5 hover:border-violet-500/20 hover:bg-[#14172a]/60 hover:shadow-lg transition-all duration-300">
+                    <h4 className="text-[11.5px] font-bold text-violet-200">{sec.title}</h4>
+                    <p className="text-[11.5px] text-slate-200/90 leading-relaxed whitespace-pre-wrap">{sec.value}</p>
                   </div>
                 ))}
               </div>
             ) : (
               <div className="bg-white/[0.035] border border-white/[0.10] border-dashed rounded-2xl p-8 flex flex-col items-center justify-center text-center gap-3">
-                <p className="text-[11px] text-slate-300/80 max-w-sm leading-relaxed">
+                <p className="text-[11px] text-slate-300/80 max-w-sm leading-relaxed font-medium">
                   No AI Project summary generated yet. The AI can audit your chats, checklist roadmap, and documents to construct goals, risks, decisions, and next steps block.
                 </p>
                 <button
@@ -508,28 +529,28 @@ export function ProjectDashboard({
                 </button>
               </div>
             )}
-          </div>
+          </motion.div>
 
           {/* Recent Discussion Sessions */}
-          <div className={cn(panelClass, "rounded-3xl p-5 space-y-3.5")}>
+          <motion.div variants={itemVariants} className={cn(panelClass, "rounded-3xl p-5 space-y-3.5")}>
             <span className={cn(sectionLabelClass, "block")}>Recent Chat Discussions</span>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {sessions.slice(0, 4).map((s: any) => (
-                <div key={s.id} className="bg-white/[0.04] hover:bg-white/[0.075] border border-white/[0.08] hover:border-violet-300/25 rounded-2xl p-3.5 flex flex-col justify-between gap-3 group transition-all hover:-translate-y-0.5">
-                  <div className="space-y-1">
+                <div key={s.id} className="bg-gradient-to-b from-[#131628]/40 to-[#0e101d]/50 hover:from-[#131628]/60 hover:to-[#0e101d]/75 border border-white/[0.08] hover:border-violet-500/30 rounded-2xl p-4 flex flex-col justify-between gap-3 group transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_8px_20px_rgba(0,0,0,0.2)]">
+                  <div className="space-y-1.5">
                     <div className="flex items-center gap-2">
-                      <span className="text-[11px]">{s.mode === "voice" ? "🎤" : "💬"}</span>
-                      <h4 className="text-xs font-bold text-white/80 group-hover:text-white transition-all truncate max-w-[200px]" title={s.title}>
+                      <span className="text-sm">{s.mode === "voice" ? "🎤" : "💬"}</span>
+                      <h4 className="text-[12.5px] font-bold text-white/90 group-hover:text-violet-200 transition-colors truncate max-w-[200px]" title={s.title}>
                         {s.title}
                       </h4>
                     </div>
-                    <span className="text-[9px] text-slate-400 block font-mono">Created {new Date(s.created_at).toLocaleDateString()}</span>
+                    <span className="text-[9.5px] text-slate-300 block font-mono">Created {new Date(s.created_at).toLocaleDateString()}</span>
                   </div>
-                  
+
                   <button
                     onClick={() => onSelectSession(s)}
-                    className="self-end px-3 py-1.5 rounded-lg border border-white/[0.10] hover:border-violet-300/35 bg-white/[0.05] text-white/75 hover:text-white text-[10px] font-medium transition-all"
+                    className="self-end px-3 py-1.5 rounded-xl border border-white/[0.08] hover:border-violet-500/40 bg-white/[0.03] text-slate-200 hover:text-white text-[10px] font-semibold transition-all hover:bg-violet-600/10 shadow-sm"
                   >
                     Resume Discussion →
                   </button>
@@ -539,13 +560,13 @@ export function ProjectDashboard({
                 <div className="col-span-2 text-center py-6 text-white/20 italic text-xs">No active chat sessions. Click "Start Discussion" above to create one.</div>
               )}
             </div>
-          </div>
+          </motion.div>
 
           {/* Agent usage Analytics visual grids */}
-          <div className="bg-white/[0.02] border border-white/[0.06] rounded-3xl p-5 space-y-3.5 backdrop-blur-md">
-            <span className="text-[9.5px] font-bold uppercase tracking-widest text-white/30 block">Agent Usage Analytics</span>
-            
-            <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+          <motion.div variants={itemVariants} className="bg-gradient-to-b from-[#131628]/40 to-[#0e101d]/50 border border-white/[0.08] rounded-3xl p-5 space-y-3.5 backdrop-blur-md">
+            <span className="text-[10px] font-bold uppercase tracking-widest text-violet-300/80 block">Agent Usage Analytics</span>
+
+            <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
               {[
                 { name: "QA", icon: "🧠", key: "qa", color: "bg-indigo-500" },
                 { name: "Research", icon: "🔍", key: "research", color: "bg-emerald-500" },
@@ -556,18 +577,16 @@ export function ProjectDashboard({
               ].map((agent) => {
                 const calls = agentUsageStats[agent.key] || 0;
                 return (
-                  <div key={agent.key} className="bg-white/[0.01] border border-white/[0.05] rounded-xl p-2.5 text-center space-y-1">
-                    <span className="text-sm block">{agent.icon}</span>
-                    <span className="text-[9.5px] font-medium text-white/45 block truncate">{agent.name}</span>
-                    <span className="text-xs font-black text-white/80 font-mono block">{calls} Calls</span>
+                  <div key={agent.key} className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-3 text-center space-y-1 hover:border-violet-500/20 hover:bg-white/[0.04] transition-all">
+                    <span className="text-lg block">{agent.icon}</span>
+                    <span className="text-[10px] font-bold text-white/60 block truncate">{agent.name}</span>
+                    <span className="text-xs font-bold text-violet-300 font-mono block">{calls} Calls</span>
                   </div>
                 );
               })}
             </div>
-          </div>
-
+          </motion.div>
         </div>
-
       </div>
     </motion.div>
   );

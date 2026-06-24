@@ -108,6 +108,12 @@ export default function WorkspacePage() {
   const fileInputRef   = useRef<HTMLInputElement>(null);
   const recognitionRef = useRef<any>(null);
   const baseInputTextRef = useRef("");
+  
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const lastSessionIdRef = useRef<string | null>(null);
+  const lastProjectIdRef = useRef<string | null>(null);
+  const lastMessagesLengthRef = useRef<number>(0);
+  const justChangedSessionRef = useRef<boolean>(false);
 
   // Data hooks
   const { data: projects  = [] } = useProjects();
@@ -288,8 +294,33 @@ export default function WorkspacePage() {
   }, [projectId, projects, setActiveProject, setActiveSession]);
   
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages.length, isStreaming]);
+    const sessionChanged = activeSession?.id !== lastSessionIdRef.current;
+    const projectChanged = projectId !== lastProjectIdRef.current;
+
+    if (sessionChanged || projectChanged) {
+      if (scrollContainerRef.current) {
+        scrollContainerRef.current.scrollTop = 0;
+      }
+      lastSessionIdRef.current = activeSession?.id || null;
+      lastProjectIdRef.current = projectId || null;
+      lastMessagesLengthRef.current = messages.length;
+      justChangedSessionRef.current = true;
+      return;
+    }
+
+    if (justChangedSessionRef.current) {
+      justChangedSessionRef.current = false;
+      lastMessagesLengthRef.current = messages.length;
+      return;
+    }
+
+    const messagesAdded = messages.length > lastMessagesLengthRef.current;
+    if (messagesAdded || isStreaming) {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
+
+    lastMessagesLengthRef.current = messages.length;
+  }, [messages, isStreaming, activeSession?.id, projectId]);
 
   useEffect(() => {
     if (projectId) {
@@ -451,15 +482,15 @@ export default function WorkspacePage() {
   ];
 
   return (
-    <div className="h-screen w-screen flex bg-[#06070d] text-white overflow-hidden font-sans antialiased relative">
+    <div className="h-screen w-screen flex bg-[#090b15] text-white overflow-hidden font-sans antialiased relative">
       
       {/* Background Gradients & Ambient Glow */}
-      <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-violet-600/10 rounded-full blur-[160px] pointer-events-none z-0" />
-      <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-emerald-600/5 rounded-full blur-[160px] pointer-events-none z-0" />
-      <div className="absolute top-[30%] right-[20%] w-[40%] h-[40%] bg-indigo-600/5 rounded-full blur-[140px] pointer-events-none z-0" />
+      <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-violet-600/15 rounded-full blur-[160px] pointer-events-none z-0" />
+      <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-emerald-600/8 rounded-full blur-[160px] pointer-events-none z-0" />
+      <div className="absolute top-[30%] right-[20%] w-[40%] h-[40%] bg-indigo-600/8 rounded-full blur-[140px] pointer-events-none z-0" />
 
       {/* Grid overlay */}
-      <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(255,255,255,0.015)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.015)_1px,transparent_1px)] bg-[size:32px_32px] pointer-events-none z-0 opacity-80" />
+      <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:32px_32px] pointer-events-none z-0 opacity-80" />
 
       <CommandPalette open={cmdOpen} onClose={() => setCmdOpen(false)} commands={commands} />
 
@@ -470,10 +501,10 @@ export default function WorkspacePage() {
             animate={{ x: 0, opacity: 1 }}
             exit={{ x: -230, opacity: 0 }}
             transition={{ type: "spring", stiffness: 350, damping: 35 }}
-            className="w-[230px] flex-shrink-0 bg-[#0a0b12]/95 border-r border-white/[0.06] flex flex-col z-20 backdrop-blur-xl h-screen overflow-hidden sticky top-0"
+            className="w-[230px] flex-shrink-0 bg-[#0c0e18]/98 border-r border-white/[0.09] flex flex-col z-20 backdrop-blur-xl h-screen overflow-hidden sticky top-0"
           >
             {/* Sidebar Header */}
-            <div className="p-4 border-b border-white/[0.06] flex flex-col gap-3">
+            <div className="p-4 border-b border-white/[0.09] flex flex-col gap-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2.5">
                   <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-violet-600 to-indigo-600 flex items-center justify-center text-sm font-bold flex-shrink-0 shadow-lg shadow-violet-500/15">✦</div>
@@ -580,7 +611,7 @@ export default function WorkspacePage() {
             </div>
 
             {/* Profile & Settings (Bottom) */}
-            <div className="p-3 border-t border-white/[0.06] relative bg-[#090a10]">
+            <div className="p-3 border-t border-white/[0.09] relative bg-[#0e101b]">
               <button onClick={() => setProfileOpen(p => !p)}
                 className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl hover:bg-white/[0.03] border border-transparent hover:border-white/[0.04] transition-all">
                 <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-500 to-pink-500 flex items-center justify-center text-[11px] font-bold flex-shrink-0 overflow-hidden ring-2 ring-white/10">
@@ -605,7 +636,7 @@ export default function WorkspacePage() {
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     exit={{ opacity: 0, y: 12, scale: 0.95 }}
                     transition={{ duration: 0.15, type: "spring", stiffness: 350, damping: 25 }}
-                    className="absolute bottom-16 left-3 w-[204px] bg-[#0c0d15] border border-white/[0.08] rounded-xl shadow-[0_12px_40px_rgba(0,0,0,0.6)] p-2.5 z-50 backdrop-blur-xl"
+                    className="absolute bottom-16 left-3 w-[204px] bg-[#131627] border border-white/[0.12] rounded-xl shadow-[0_12px_40px_rgba(0,0,0,0.6)] p-2.5 z-50 backdrop-blur-xl"
                   >
                     <div className="flex items-center gap-2.5 pb-2.5 border-b border-white/[0.06] mb-2 px-1">
                       <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-500 to-pink-500 flex items-center justify-center text-[11px] font-bold flex-shrink-0 overflow-hidden">
@@ -648,22 +679,22 @@ export default function WorkspacePage() {
       <div className="flex-1 h-screen flex flex-col min-w-0 overflow-hidden z-10 relative">
 
         {/* Workspace Top Bar Header */}
-        <div className="h-14 border-b border-white/[0.06] flex items-center justify-between px-4 md:px-5 gap-3 bg-[#06070d]/75 backdrop-blur-md z-10">
+        <div className="h-14 border-b border-white/[0.08] flex items-center justify-between px-4 md:px-5 gap-3 bg-[#0c0e1a]/80 backdrop-blur-md z-10">
           <div className="flex items-center gap-3 min-w-0">
             <button onClick={() => setSidebarOpen(p => !p)}
-              className="w-8 h-8 flex items-center justify-center rounded-lg border border-white/[0.05] bg-white/[0.02] text-white/40 hover:text-white/80 hover:bg-white/[0.05] transition-all text-[12px] flex-shrink-0 shadow-sm"
+              className="w-8 h-8 flex items-center justify-center rounded-lg border border-white/[0.08] bg-white/[0.02] text-white/50 hover:text-white hover:bg-white/[0.05] transition-all text-[12px] flex-shrink-0 shadow-sm"
               title="Toggle sidebar">
               ☰
             </button>
 
-            <div className="flex items-center gap-2 text-[12.5px] font-semibold text-white/40 truncate">
-              <span className="hover:text-white/60 cursor-pointer transition-colors" onClick={() => router.push("/dashboard")}>Projects</span>
-              <span className="text-white/15">/</span>
-              <span className="text-white/80 font-bold bg-white/[0.03] px-2 py-0.5 border border-white/[0.05] rounded-md truncate max-w-[140px] md:max-w-xs">{activeProject?.name || "Workspace"}</span>
+            <div className="flex items-center gap-2 text-[12.5px] font-semibold text-white/60 truncate">
+              <span className="hover:text-white cursor-pointer transition-colors" onClick={() => router.push("/dashboard")}>Projects</span>
+              <span className="text-white/20">/</span>
+              <span className="text-white font-bold bg-white/[0.03] px-2 py-0.5 border border-white/[0.08] rounded-md truncate max-w-[140px] md:max-w-xs">{activeProject?.name || "Workspace"}</span>
               {activeSession && (
                 <>
-                  <span className="text-white/15">/</span>
-                  <span className="text-violet-400 font-medium truncate max-w-[100px] md:max-w-[180px]">{activeSession.title}</span>
+                  <span className="text-white/20">/</span>
+                  <span className="text-violet-400 font-bold truncate max-w-[100px] md:max-w-[180px]">{activeSession.title}</span>
                 </>
               )}
             </div>
@@ -774,7 +805,7 @@ export default function WorkspacePage() {
 
           <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
 
-            <div className="flex-1 overflow-y-auto px-4 md:px-8 py-6 space-y-6"
+            <div ref={scrollContainerRef} className="flex-1 overflow-y-auto px-4 md:px-8 pt-6 pb-44 space-y-6"
               style={{ scrollbarWidth: "thin", scrollbarColor: "rgba(255,255,255,0.06) transparent" }}>
 
               {!activeSession ? (
@@ -856,37 +887,37 @@ export default function WorkspacePage() {
                           </span>
                         )}
 
-                        <div className={cn(
-                          "px-5 py-4 text-[13px] leading-relaxed shadow-xl",
-                          msg.role === "user"
-                            ? "bg-violet-600/10 border border-violet-500/20 rounded-2xl rounded-tr-sm text-white/80"
-                            : "bg-[#0b0c14]/40 border border-white/[0.06] rounded-2xl rounded-tl-sm text-white/80 backdrop-blur-sm"
-                        )}>
-                          {msg.role === "assistant" ? (
-                            <ReactMarkdown remarkPlugins={[remarkGfm]} components={{
-                              code: ({ className, children, ...props }: any) => {
-                                const inline = !className;
-                                const match = /language-(\w+)/.exec(className || "");
-                                const lang = match ? match[1] : "";
-                                const codeContent = String(children).replace(/\n$/, "");
-                                
-                                return inline
-                                  ? <code className="bg-white/10 px-1.5 py-0.5 rounded text-violet-300 text-[12px] font-mono" {...props}>{children}</code>
-                                  : <CodeBlock code={codeContent} language={lang} />;
-                              },
-                              h1: ({ children }: any) => <h1 className="text-[16px] font-bold text-white/90 mt-4 mb-2 pb-1 border-b border-white/5">{children}</h1>,
-                              h2: ({ children }: any) => <h2 className="text-[14.5px] font-bold text-white/85 mt-4 mb-2 flex items-center gap-2 text-violet-300">{children}</h2>,
-                              h3: ({ children }: any) => <h3 className="text-[13px] font-semibold text-white/80 mt-3 mb-1">{children}</h3>,
-                              p:  ({ children }: any) => <p className="text-[13px] text-white/70 leading-relaxed mb-3">{children}</p>,
-                              ul: ({ children }: any) => <ul className="space-y-1.5 my-2 pl-5 list-disc text-white/60">{children}</ul>,
-                              ol: ({ children }: any) => <ol className="space-y-1.5 my-2 pl-5 list-decimal text-white/60">{children}</ol>,
-                              li: ({ children }: any) => <li className="text-[12.5px] text-white/65">{children}</li>,
-                              table: ({ children }: any) => <div className="overflow-x-auto my-3 border border-white/5 rounded-xl"><table className="w-full text-[12px] border-collapse bg-white/[0.01]">{children}</table></div>,
-                              th: ({ children }: any) => <th className="border-b border-white/10 px-3 py-2 text-white/60 font-semibold bg-white/[0.03] text-left">{children}</th>,
-                              td: ({ children }: any) => <td className="border-b border-white/[0.05] px-3 py-2 text-white/50">{children}</td>,
-                              blockquote: ({ children }: any) => <blockquote className="border-l-3 border-violet-500 bg-violet-500/5 px-4 py-2 my-3 rounded-r-lg text-white/60 italic leading-relaxed">{children}</blockquote>,
-                              strong: ({ children }: any) => <strong className="font-bold text-white/85">{children}</strong>,
-                            }}>
+            <div className={cn(
+              "px-5 py-4 text-[13.5px] leading-relaxed shadow-xl transition-all duration-300",
+              msg.role === "user"
+                ? "bg-gradient-to-r from-violet-600/15 to-indigo-600/15 border border-violet-500/30 rounded-2xl rounded-tr-sm text-white font-medium"
+                : "bg-[#131627]/60 border border-white/[0.09] rounded-2xl rounded-tl-sm text-white/95 backdrop-blur-md hover:border-violet-500/20"
+            )}>
+              {msg.role === "assistant" ? (
+                <ReactMarkdown remarkPlugins={[remarkGfm]} components={{
+                  code: ({ className, children, ...props }: any) => {
+                    const inline = !className;
+                    const match = /language-(\w+)/.exec(className || "");
+                    const lang = match ? match[1] : "";
+                    const codeContent = String(children).replace(/\n$/, "");
+                    
+                    return inline
+                      ? <code className="bg-white/10 px-1.5 py-0.5 rounded text-violet-300 text-[12px] font-mono" {...props}>{children}</code>
+                      : <CodeBlock code={codeContent} language={lang} />;
+                  },
+                  h1: ({ children }: any) => <h1 className="text-[17px] font-extrabold text-white mt-4 mb-2 pb-1 border-b border-white/10">{children}</h1>,
+                  h2: ({ children }: any) => <h2 className="text-[15px] font-bold text-violet-200 mt-4 mb-2 flex items-center gap-2">{children}</h2>,
+                  h3: ({ children }: any) => <h3 className="text-[13.5px] font-bold text-white mt-3 mb-1">{children}</h3>,
+                  p:  ({ children }: any) => <p className="text-[13px] text-slate-100/90 leading-relaxed mb-3 font-normal">{children}</p>,
+                  ul: ({ children }: any) => <ul className="space-y-1.5 my-2 pl-5 list-disc text-slate-200/90">{children}</ul>,
+                  ol: ({ children }: any) => <ol className="space-y-1.5 my-2 pl-5 list-decimal text-slate-200/90">{children}</ol>,
+                  li: ({ children }: any) => <li className="text-[12.5px] text-slate-100/95">{children}</li>,
+                  table: ({ children }: any) => <div className="overflow-x-auto my-3 border border-white/10 rounded-xl"><table className="w-full text-[12px] border-collapse bg-white/[0.02]">{children}</table></div>,
+                  th: ({ children }: any) => <th className="border-b border-white/15 px-3 py-2 text-white font-semibold bg-white/[0.04] text-left">{children}</th>,
+                  td: ({ children }: any) => <td className="border-b border-white/[0.08] px-3 py-2 text-slate-200/90">{children}</td>,
+                  blockquote: ({ children }: any) => <blockquote className="border-l-3 border-violet-500 bg-violet-500/8 px-4 py-2 my-3 rounded-r-lg text-slate-200/90 italic leading-relaxed">{children}</blockquote>,
+                  strong: ({ children }: any) => <strong className="font-bold text-white">{children}</strong>,
+                }}>
                               {msg.content || "⏳"}
                             </ReactMarkdown>
                           ) : (
@@ -1054,67 +1085,65 @@ export default function WorkspacePage() {
             </div>
 
             {/* Bottom Command Prompt Input Panel */}
-            <div className="w-full bg-[#0e1017]/90 backdrop-blur-xl border-t border-white/[0.08] py-4 px-4 md:px-8 flex-shrink-0 z-10">
+            <div className={cn(
+              "fixed bottom-0 bg-gradient-to-b from-[#131628]/95 to-[#0e101d]/98 backdrop-blur-xl border-t border-white/[0.12] py-4 px-4 md:px-8 z-10 transition-all duration-300",
+              sidebarOpen ? "left-[230px]" : "left-0",
+              rightPanelOpen ? "right-[330px]" : "right-0"
+            )}>
               <div className="max-w-4xl mx-auto w-full flex flex-col gap-3">
                 
-                {/* Mode Pill Bar */}
-                <div className="flex items-center justify-between border-b border-white/[0.04] pb-2 text-[10px] text-white/20">
-                  <div className="flex items-center gap-2">
-                    <span className="px-2 py-0.5 rounded bg-violet-500/10 border border-violet-500/15 text-violet-400 font-semibold tracking-wider uppercase">Auto-Orchestrator</span>
-                    <span className="w-1 h-1 bg-white/10 rounded-full" />
-                    <span>Input routing mode active</span>
-                  </div>
-                  {inputValue.length > 0 && (
-                    <span className="font-mono text-white/15">{inputValue.length} characters</span>
-                  )}
-                </div>
-
-                <div className="flex items-end gap-3">
-                  <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" />
+                <div className="relative group/input">
+                  {/* Animated ambient glow ring around the input block */}
+                  <div className="absolute -inset-px bg-gradient-to-r from-violet-500/30 to-indigo-500/30 rounded-2xl blur-[3px] opacity-0 group-focus-within/input:opacity-100 transition-opacity duration-500 pointer-events-none" />
                   
-                  <textarea ref={inputRef} value={inputValue}
-                    onChange={e => { setInputValue(e.target.value); e.target.style.height = "auto"; e.target.style.height = Math.min(e.target.scrollHeight, 120) + "px"; }}
-                    onKeyDown={handleKeyDown}
-                    placeholder={isListening ? "Listening... Speak now!" : !activeSession ? "Type a prompt to start a new chat in this project..." : "Command the agent team..."}
-                    rows={1} disabled={isStreaming}
-                    className="flex-1 bg-transparent outline-none text-[13px] text-white/80 placeholder-white/20 leading-relaxed resize-none min-h-[22px] max-h-[120px]"
-                  />
-                  
-                  {/* Action button layout */}
-                  <div className="flex items-center gap-1.5 flex-shrink-0 pb-0.5">
-                    <button
-                      onClick={() => fileInputRef.current?.click()}
-                      className="w-8 h-8 rounded-lg flex items-center justify-center text-sm transition-all border border-white/[0.06] bg-white/[0.02] text-white/35 hover:text-white/70 hover:bg-white/[0.05]"
-                      title="Upload file (CSV, TXT, PDF, etc.)"
-                    >
-                      📎
-                    </button>
+                  {/* Glass Card Input Box Container */}
+                  <div className="relative flex items-end gap-3 bg-[#0d0e16]/60 border border-white/[0.08] focus-within:border-violet-500/40 rounded-2xl p-3.5 backdrop-blur-md transition-all duration-300 shadow-[0_4px_30px_rgba(0,0,0,0.3)] focus-within:shadow-[0_0_20px_rgba(139,92,246,0.12)]">
+                    <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" />
                     
-                    <button onClick={toggleListening}
-                      className={cn("relative w-8 h-8 rounded-lg flex items-center justify-center text-sm transition-all border",
-                        isListening ? "bg-red-500/15 border-red-500/35 text-red-400 shadow-md shadow-red-500/10" :
-                        isVoice ? "bg-emerald-500/15 border-emerald-500/35 text-emerald-400" :
-                        "border-white/[0.06] bg-white/[0.02] text-white/35 hover:text-white/70 hover:bg-white/[0.05]"
-                      )} title={isListening ? "Stop voice listening" : "Enable microphone input"}>
-                      {isListening ? (
-                        <>
-                          <span className="absolute inset-0 rounded-lg bg-red-500/20 animate-ping" />
-                          <span className="z-10 animate-pulse text-[11px]">⏹️</span>
-                        </>
-                      ) : (
-                        "🎤"
-                      )}
-                    </button>
+                    <textarea ref={inputRef} value={inputValue}
+                      onChange={e => { setInputValue(e.target.value); e.target.style.height = "auto"; e.target.style.height = Math.min(e.target.scrollHeight, 120) + "px"; }}
+                      onKeyDown={handleKeyDown}
+                      placeholder={isListening ? "Listening... Speak now!" : !activeSession ? "Type a prompt to start a new chat in this project..." : "Command the agent team..."}
+                      rows={1} disabled={isStreaming}
+                      className="flex-1 bg-transparent outline-none text-[13px] text-white/90 placeholder-white/35 leading-relaxed resize-none min-h-[22px] max-h-[120px]"
+                    />
                     
-                    <button onClick={handleSend} disabled={isStreaming || !inputValue.trim()}
-                      className="w-8 h-8 rounded-lg bg-violet-600 border border-violet-500 text-white flex items-center justify-center text-sm hover:bg-violet-500 transition-all disabled:opacity-20 disabled:cursor-not-allowed font-bold shadow-lg shadow-violet-500/10 hover:scale-[0.98]">
-                      ↑
-                    </button>
+                    {/* Action button layout */}
+                    <div className="flex items-center gap-1.5 flex-shrink-0 pb-0.5">
+                      <button
+                        onClick={() => fileInputRef.current?.click()}
+                        className="w-8 h-8 rounded-xl flex items-center justify-center text-sm transition-all border border-white/[0.08] bg-white/[0.03] text-white/50 hover:text-white hover:bg-white/[0.08] hover:border-white/[0.15]"
+                        title="Upload file (CSV, TXT, PDF, etc.)"
+                      >
+                        📎
+                      </button>
+                      
+                      <button onClick={toggleListening}
+                        className={cn("relative w-8 h-8 rounded-xl flex items-center justify-center text-sm transition-all border",
+                          isListening ? "bg-red-500/15 border-red-500/35 text-red-400 shadow-md shadow-red-500/10" :
+                          isVoice ? "bg-emerald-500/15 border-emerald-500/35 text-emerald-400" :
+                          "border-white/[0.08] bg-white/[0.03] text-white/50 hover:text-white hover:bg-white/[0.08] hover:border-white/[0.15]"
+                        )} title={isListening ? "Stop voice listening" : "Enable microphone input"}>
+                        {isListening ? (
+                          <>
+                            <span className="absolute inset-0 rounded-xl bg-red-500/20 animate-ping" />
+                            <span className="z-10 animate-pulse text-[11px]">⏹️</span>
+                          </>
+                        ) : (
+                          "🎤"
+                        )}
+                      </button>
+                      
+                      <button onClick={handleSend} disabled={isStreaming || !inputValue.trim()}
+                        className="w-8 h-8 rounded-xl bg-violet-600 border border-violet-500 text-white flex items-center justify-center text-sm hover:bg-violet-500 hover:scale-[1.03] transition-all disabled:opacity-20 disabled:cursor-not-allowed disabled:scale-100 font-bold shadow-lg shadow-violet-500/15">
+                        ↑
+                      </button>
+                    </div>
                   </div>
                 </div>
 
                 {/* Swarm Details and commands description */}
-                <div className="flex items-center justify-between mt-1 px-2 text-[10px] text-white/15">
+                <div className="flex items-center justify-between mt-1 px-2 text-[10px] text-white/35">
                   <span className="flex items-center gap-1.5">
                     <span>⚡ Multi-Agent Swarm</span>
                     <span>·</span>
