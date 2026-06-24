@@ -53,13 +53,38 @@ You ask: "How do I build an AI-powered crop monitoring drone?"
 
 To view the raw image assets directly in this repository, visit the [assets/screenshots](assets/screenshots/) folder.
 
-| Signup Page | Dashboard Page | Workspace Shell |
-|:---:|:---:|:---:|
-| ![Signup Page](assets/screenshots/signup%20v2.png) | ![Dashboard Page](assets/screenshots/dashboard-1%20v2.png) | ![Workspace Shell](assets/screenshots/workspace-1%20v2.png) |
-
-| Roadmap View | Profile Settings | Agent Orchestration Graph |
-|:---:|:---:|:---:|
-| ![Roadmap View](assets/screenshots/general%20chat%20v2.png) | ![Profile Settings](assets/screenshots/profile%20page%20v2.png) | ![Agent Orchestration](assets/screenshots/agent%20routing%20v2.png) |
+<table width="100%">
+  <tr>
+    <td width="50%" align="center">
+      <b>Signup Page</b><br/>
+      <img src="assets/screenshots/signup%20v2.png" width="100%" alt="Signup Page" />
+    </td>
+    <td width="50%" align="center">
+      <b>Dashboard Page</b><br/>
+      <img src="assets/screenshots/dashboard-1%20v2.png" width="100%" alt="Dashboard Page" />
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" align="center">
+      <b>Workspace Shell</b><br/>
+      <img src="assets/screenshots/workspace-1%20v2.png" width="100%" alt="Workspace Shell" />
+    </td>
+    <td width="50%" align="center">
+      <b>Roadmap View</b><br/>
+      <img src="assets/screenshots/general%20chat%20v2.png" width="100%" alt="Roadmap View" />
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" align="center">
+      <b>Profile Settings</b><br/>
+      <img src="assets/screenshots/profile%20page%20v2.png" width="100%" alt="Profile Settings" />
+    </td>
+    <td width="50%" align="center">
+      <b>Agent Orchestration Graph</b><br/>
+      <img src="assets/screenshots/agent%20routing%20v2.png" width="100%" alt="Agent Orchestration Graph" />
+    </td>
+  </tr>
+</table>
 
 ---
 
