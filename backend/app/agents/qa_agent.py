@@ -91,7 +91,17 @@ async def classify_intent(user_message: str, conversation_history: list[dict]) -
             system_prompt=INTENT_SYSTEM_PROMPT,
             max_tokens=500,
         )
-        data = json.loads(result)
+        # Clean potential markdown wrappers
+        clean_text = result.strip()
+        if clean_text.startswith("```json"):
+            clean_text = clean_text[7:]
+        elif clean_text.startswith("```"):
+            clean_text = clean_text[3:]
+        if clean_text.endswith("```"):
+            clean_text = clean_text[:-3]
+        clean_text = clean_text.strip()
+
+        data = json.loads(clean_text)
         # Ensure 'intents' is always a list
         if "intents" not in data or not isinstance(data["intents"], list):
             data["intents"] = ["simple_qa"]

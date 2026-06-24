@@ -29,6 +29,7 @@ def call_groq(
     max_tokens: int = 2048,
     temperature: float | None = None,
     system_prompt: str | None = None,
+    response_format: dict | None = None,
 ) -> str:
     """
     Single synchronous Groq call.
@@ -38,12 +39,16 @@ def call_groq(
     if system_prompt:
         messages = [{"role": "system", "content": system_prompt}] + messages
 
-    response = groq_client.chat.completions.create(
-        model=model or settings.GROQ_MODEL,
-        messages=messages,
-        max_tokens=max_tokens,
-        temperature=temperature if temperature is not None else settings.GROQ_TEMPERATURE,
-    )
+    kwargs = {
+        "model": model or settings.GROQ_MODEL,
+        "messages": messages,
+        "max_tokens": max_tokens,
+        "temperature": temperature if temperature is not None else settings.GROQ_TEMPERATURE,
+    }
+    if response_format is not None:
+        kwargs["response_format"] = response_format
+
+    response = groq_client.chat.completions.create(**kwargs)
     return response.choices[0].message.content.strip()
 
 
@@ -53,6 +58,7 @@ async def call_groq_async(
     max_tokens: int = 2048,
     temperature: float | None = None,
     system_prompt: str | None = None,
+    response_format: dict | None = None,
 ) -> str:
     """
     Async Groq call for FastAPI endpoints.
@@ -61,12 +67,16 @@ async def call_groq_async(
     if system_prompt:
         messages = [{"role": "system", "content": system_prompt}] + messages
 
-    response = await async_groq_client.chat.completions.create(
-        model=model or settings.GROQ_MODEL,
-        messages=messages,
-        max_tokens=max_tokens,
-        temperature=temperature if temperature is not None else settings.GROQ_TEMPERATURE,
-    )
+    kwargs = {
+        "model": model or settings.GROQ_MODEL,
+        "messages": messages,
+        "max_tokens": max_tokens,
+        "temperature": temperature if temperature is not None else settings.GROQ_TEMPERATURE,
+    }
+    if response_format is not None:
+        kwargs["response_format"] = response_format
+
+    response = await async_groq_client.chat.completions.create(**kwargs)
     return response.choices[0].message.content.strip()
 
 
@@ -111,7 +121,13 @@ def call_groq_json(
     System prompt MUST instruct the model to output only valid JSON.
     """
     full_system = system_prompt + "\n\nIMPORTANT: Respond ONLY with valid JSON. No markdown, no explanation."
-    return call_groq(messages, system_prompt=full_system, max_tokens=max_tokens, temperature=0.2)
+    return call_groq(
+        messages,
+        system_prompt=full_system,
+        max_tokens=max_tokens,
+        temperature=0.2,
+        response_format={"type": "json_object"}
+    )
 
 
 async def call_groq_json_async(
@@ -123,4 +139,10 @@ async def call_groq_json_async(
     Async force JSON output from Groq.
     """
     full_system = system_prompt + "\n\nIMPORTANT: Respond ONLY with valid JSON. No markdown, no explanation."
-    return await call_groq_async(messages, system_prompt=full_system, max_tokens=max_tokens, temperature=0.2)
+    return await call_groq_async(
+        messages,
+        system_prompt=full_system,
+        max_tokens=max_tokens,
+        temperature=0.2,
+        response_format={"type": "json_object"}
+    )
