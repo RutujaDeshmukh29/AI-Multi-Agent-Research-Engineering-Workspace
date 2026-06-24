@@ -46,17 +46,20 @@ You ask: "How do I build an AI-powered crop monitoring drone?"
 
 ---
 
-## 📸 Screenshots
+## 📸 Screenshots & Demos
 
-> *Add your actual screenshots here after running the project*
+> [!NOTE]
+> For a live demonstration walkthrough and additional views, please refer to the [Live Demo & Screenshots Walkthrough Link](https://your-demo-or-gallery-link.com) *(URL will be updated soon)*.
+
+To view the raw image assets directly in this repository, visit the [assets/screenshots](assets/screenshots/) folder.
 
 | Signup Page | Dashboard Page | Workspace Shell |
 |:---:|:---:|:---:|
-| ![Signup Page](assets\screenshots\signup v2.png) | ![Dashboard Page](assets\screenshots\dashboard-1 v2.png) | ![Workspace Shell](assets\screenshots\workspace-1 v2.png) |
+| ![Signup Page](assets/screenshots/signup v2.png) | ![Dashboard Page](assets/screenshots/dashboard-1 v2.png) | ![Workspace Shell](assets/screenshots/workspace-1 v2.png) |
 
 | Roadmap View | Profile Settings | Agent Orchestration Graph |
 |:---:|:---:|:---:|
-| ![Roadmap View](assets\screenshots\general chat v2.png) | ![Profile Settings](assets\screenshots\profile page v2.png) | ![Agent Orchestration](assets\screenshots\agent routing v2.png) |
+| ![Roadmap View](assets/screenshots/general chat v2.png) | ![Profile Settings](assets/screenshots/profile page v2.png) | ![Agent Orchestration](assets/screenshots/agent routing v2.png) |
 
 ---
 
