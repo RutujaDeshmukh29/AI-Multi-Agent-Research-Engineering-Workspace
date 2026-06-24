@@ -50,9 +50,13 @@ You ask: "How do I build an AI-powered crop monitoring drone?"
 
 > *Add your actual screenshots here after running the project*
 
-| Dashboard | Workspace | Roadmap | Memory Panel |
-|-----------|-----------|---------|--------------|
-| ![Dashboard](docs/screenshots/dashboard.png) | ![Workspace](docs/screenshots/workspace.png) | ![Roadmap](docs/screenshots/roadmap.png) | ![Memory](docs/screenshots/memory.png) |
+| Signup Page | Dashboard Page | Workspace Shell |
+|:---:|:---:|:---:|
+| ![Signup Page](assets\screenshots\signup v2.png) | ![Dashboard Page](assets\screenshots\dashboard-1 v2.png) | ![Workspace Shell](assets\screenshots\workspace-1 v2.png) |
+
+| Roadmap View | Profile Settings | Agent Orchestration Graph |
+|:---:|:---:|:---:|
+| ![Roadmap View](assets\screenshots\general chat v2.png) | ![Profile Settings](assets\screenshots\profile page v2.png) | ![Agent Orchestration](assets\screenshots\agent routing v2.png) |
 
 ---
 
