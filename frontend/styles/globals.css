@@ -94,6 +94,13 @@
     @apply border-border;
   }
 
+  html,
+  body {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+  }
+
   html {
     @apply dark; /* Default to dark mode */
   }

@@ -71,6 +71,10 @@ export function ProjectDashboard({
     }
   }
 
+  const panelClass =
+    "bg-slate-950/55 border border-white/[0.10] rounded-2xl backdrop-blur-xl shadow-[0_18px_55px_rgba(0,0,0,0.24)] transition-all duration-300 hover:-translate-y-0.5 hover:border-violet-300/25 hover:bg-slate-900/70 hover:shadow-[0_24px_70px_rgba(79,70,229,0.14)]";
+  const sectionLabelClass = "text-[9.5px] font-bold uppercase tracking-widest text-slate-300/75";
+
   // Handle Summary Generation
   const handleGenerateSummary = async () => {
     const toastId = toast.loading("AI is compiling project summary from chat logs & roadmap...");
@@ -257,15 +261,22 @@ export function ProjectDashboard({
   };
 
   return (
-    <div className="space-y-6 pb-12">
+    <motion.div
+      initial={{ opacity: 0, y: 14 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.35, ease: "easeOut" }}
+      className="min-h-full flex flex-col space-y-6 pb-4"
+    >
       {/* Dashboard Top Header bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white/[0.02] border border-white/[0.06] rounded-2xl p-5 backdrop-blur-md">
+      <div className="relative overflow-hidden flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-gradient-to-br from-slate-900/82 via-[#14172a]/78 to-slate-950/74 border border-white/[0.12] rounded-2xl p-5 backdrop-blur-xl shadow-[0_22px_70px_rgba(0,0,0,0.25)]">
+        <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-violet-300/45 to-transparent" />
+        <div className="absolute -right-24 -top-24 h-48 w-48 rounded-full bg-violet-500/14 blur-3xl pointer-events-none" />
         <div>
           <div className="flex items-center gap-2">
             <span className="text-xl">{activeProject?.icon || "🧠"}</span>
-            <h1 className="text-lg font-bold text-white/90">{activeProject?.name} Workspace</h1>
+            <h1 className="text-lg font-bold text-white">{activeProject?.name} Workspace</h1>
           </div>
-          <p className="text-xs text-white/40 mt-1 max-w-xl line-clamp-2">
+          <p className="text-xs text-slate-300/85 mt-1 max-w-xl line-clamp-2 leading-relaxed">
             {activeProject?.description || "Collaborative multi-agent development space."}
           </p>
         </div>
@@ -273,7 +284,7 @@ export function ProjectDashboard({
         <div className="flex items-center gap-2 flex-shrink-0 relative">
           <button
             onClick={() => setExportOpen(prev => !prev)}
-            className="px-3.5 py-2 rounded-xl bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.08] text-[11.5px] font-semibold transition-all flex items-center gap-1.5"
+            className="px-3.5 py-2 rounded-xl bg-white/[0.06] hover:bg-white/[0.10] border border-white/[0.12] text-[11.5px] text-white/85 font-semibold transition-all flex items-center gap-1.5 hover:-translate-y-0.5"
           >
             📥 Export Workspace
           </button>
@@ -325,7 +336,7 @@ export function ProjectDashboard({
             )}
           </AnimatePresence>
 
-          <Button onClick={onNewChat} className="bg-violet-600 hover:bg-violet-500 text-xs font-semibold px-4 py-2 rounded-xl">
+          <Button onClick={onNewChat} className="bg-violet-600 hover:bg-violet-500 text-xs font-semibold px-4 py-2 rounded-xl shadow-lg shadow-violet-500/20 hover:shadow-violet-500/30 hover:-translate-y-0.5 transition-all">
             💬 Start Discussion
           </Button>
         </div>
@@ -334,8 +345,8 @@ export function ProjectDashboard({
       {/* Dynamic Statistics Grid */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {/* Project Status */}
-        <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-4.5 space-y-1.5 backdrop-blur-md">
-          <span className="text-[9.5px] font-bold uppercase tracking-widest text-white/30">Workspace Status</span>
+        <div className={cn(panelClass, "p-4.5 space-y-1.5")}>
+          <span className={sectionLabelClass}>Workspace Status</span>
           <div className="flex items-center gap-2">
             <div className={cn("px-2.5 py-0.5 rounded-full text-[10px] font-bold border", statusColor)}>
               {projectStatus}
@@ -344,36 +355,36 @@ export function ProjectDashboard({
         </div>
 
         {/* Roadmap Progress */}
-        <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-4.5 space-y-2.5 backdrop-blur-md">
+        <div className={cn(panelClass, "p-4.5 space-y-2.5")}>
           <div className="flex justify-between items-center">
-            <span className="text-[9.5px] font-bold uppercase tracking-widest text-white/30">Roadmap Progress</span>
-            <span className="text-[10px] text-white/50 font-bold font-mono">{progressPercent}%</span>
+            <span className={sectionLabelClass}>Roadmap Progress</span>
+            <span className="text-[10px] text-white/80 font-bold font-mono">{progressPercent}%</span>
           </div>
           <div className="space-y-1">
             <div className="w-full h-1.5 rounded-full bg-white/[0.06] overflow-hidden">
               <div className="h-full bg-gradient-to-r from-violet-500 to-indigo-600 rounded-full transition-all duration-500" style={{ width: `${progressPercent}%` }} />
             </div>
-            <span className="text-[9px] text-white/20 block">{completedTasksCount} / {totalTasksCount} tasks complete</span>
+            <span className="text-[9px] text-slate-400 block">{completedTasksCount} / {totalTasksCount} tasks complete</span>
           </div>
         </div>
 
         {/* Files Uploaded */}
-        <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-4.5 space-y-1 backdrop-blur-md">
-          <span className="text-[9.5px] font-bold uppercase tracking-widest text-white/30">Knowledge Database</span>
-          <p className="text-xl font-black font-mono text-white/80">{files.length}</p>
-          <span className="text-[9.5px] text-white/25 block">Uploaded files & documents</span>
+        <div className={cn(panelClass, "p-4.5 space-y-1")}>
+          <span className={sectionLabelClass}>Knowledge Database</span>
+          <p className="text-xl font-black font-mono text-white">{files.length}</p>
+          <span className="text-[9.5px] text-slate-400 block">Uploaded files & documents</span>
         </div>
 
         {/* Memories count */}
-        <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-4.5 space-y-1 backdrop-blur-md">
-          <span className="text-[9.5px] font-bold uppercase tracking-widest text-white/30">Persistent Memory</span>
+        <div className={cn(panelClass, "p-4.5 space-y-1")}>
+          <span className={sectionLabelClass}>Persistent Memory</span>
           <div className="flex items-baseline gap-1.5">
-            <p className="text-xl font-black font-mono text-white/80">
+            <p className="text-xl font-black font-mono text-white">
               {memoriesLoading ? "..." : memoriesCount}
             </p>
             <span className="text-[10px] text-violet-400 font-bold">pgvector</span>
           </div>
-          <span className="text-[9.5px] text-white/25 block">Cross-session learnings</span>
+          <span className="text-[9.5px] text-slate-400 block">Cross-session learnings</span>
         </div>
       </div>
 
@@ -384,8 +395,8 @@ export function ProjectDashboard({
         <div className="lg:col-span-1 space-y-6">
           
           {/* Visual Project Timeline */}
-          <div className="bg-white/[0.02] border border-white/[0.06] rounded-3xl p-5 space-y-4.5 backdrop-blur-md">
-            <span className="text-[9.5px] font-bold uppercase tracking-widest text-white/30 block">Project Milestone Path</span>
+          <div className={cn(panelClass, "rounded-3xl p-5 space-y-4.5")}>
+            <span className={cn(sectionLabelClass, "block")}>Project Milestone Path</span>
             
             <div className="relative pl-6 space-y-6 border-l border-white/[0.08] ml-2 mt-2">
               {[
@@ -401,15 +412,15 @@ export function ProjectDashboard({
                     "absolute -left-[31px] top-0.5 w-4 h-4 rounded-full flex items-center justify-center border-2 transition-all",
                     step.trigger 
                       ? "bg-violet-600 border-violet-500 shadow-md shadow-violet-500/25" 
-                      : "bg-[#0d0e16] border-white/[0.12]"
+                      : "bg-slate-950 border-white/[0.18]"
                   )}>
                     {step.trigger && <span className="text-[7.5px] text-white font-bold">✓</span>}
                   </div>
                   <div>
-                    <h4 className={cn("text-[11.5px] font-bold", step.trigger ? "text-white/90" : "text-white/30")}>
+                    <h4 className={cn("text-[11.5px] font-bold", step.trigger ? "text-white" : "text-slate-400")}>
                       {step.phase}
                     </h4>
-                    <p className="text-[9.5px] text-white/30 mt-0.5">{step.task}</p>
+                    <p className="text-[9.5px] text-slate-400/85 mt-0.5">{step.task}</p>
                   </div>
                 </div>
               ))}
@@ -417,14 +428,14 @@ export function ProjectDashboard({
           </div>
 
           {/* Files List Preview */}
-          <div className="bg-white/[0.02] border border-white/[0.06] rounded-3xl p-5 space-y-3.5 backdrop-blur-md">
-            <span className="text-[9.5px] font-bold uppercase tracking-widest text-white/30 block">Workspace Documents</span>
+          <div className={cn(panelClass, "rounded-3xl p-5 space-y-3.5")}>
+            <span className={cn(sectionLabelClass, "block")}>Workspace Documents</span>
             <div className="space-y-2">
               {files.map((file: any) => (
-                <div key={file.id} className="flex items-center justify-between p-2.5 bg-white/[0.01] border border-white/[0.04] rounded-xl hover:border-white/[0.08] transition-all">
+                <div key={file.id} className="flex items-center justify-between p-2.5 bg-white/[0.04] border border-white/[0.08] rounded-xl hover:border-violet-300/25 hover:bg-white/[0.07] transition-all">
                   <div className="min-w-0 flex-1">
-                    <p className="text-[11px] font-mono text-white/70 truncate">{file.file_name}</p>
-                    <span className="text-[8.5px] text-white/25 mt-0.5 block">
+                    <p className="text-[11px] font-mono text-white/85 truncate">{file.file_name}</p>
+                    <span className="text-[8.5px] text-slate-400 mt-0.5 block">
                       {(file.file_size / 1024).toFixed(1)} KB · {file.file_type?.split("/")[1] || "doc"}
                     </span>
                   </div>
@@ -450,8 +461,8 @@ export function ProjectDashboard({
         <div className="lg:col-span-2 space-y-6">
 
           {/* AI Project Summary */}
-          <div className="bg-white/[0.02] border border-white/[0.06] rounded-3xl p-5 space-y-4 backdrop-blur-md">
-            <div className="flex items-center justify-between border-b border-white/[0.04] pb-2.5">
+          <div className={cn(panelClass, "rounded-3xl p-5 space-y-4")}>
+            <div className="flex items-center justify-between border-b border-white/[0.08] pb-2.5">
               <span className="text-[9.5px] font-bold uppercase tracking-widest text-white/30">✨ AI Executive Project Summary</span>
               <button
                 disabled={generateSummary.isPending}
@@ -465,7 +476,7 @@ export function ProjectDashboard({
             {summaryLoading ? (
               <div className="py-12 flex flex-col items-center justify-center gap-2">
                 <div className="w-6 h-6 border-2 border-t-violet-500 border-r-transparent animate-spin rounded-full" />
-                <span className="text-[10px] text-white/35">Fetching summary metadata...</span>
+                <span className="text-[10px] text-slate-400">Fetching summary metadata...</span>
               </div>
             ) : summary ? (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pr-1">
@@ -477,15 +488,15 @@ export function ProjectDashboard({
                   { title: "⚡ Immediate Next Steps", value: summary.next_steps },
                   { title: "⚠️ Primary Risks & Blocks", value: summary.risks },
                 ].map((sec) => (
-                  <div key={sec.title} className="bg-white/[0.01] border border-white/[0.04] p-3 rounded-2xl space-y-1.5">
-                    <h4 className="text-[11px] font-bold text-white/80">{sec.title}</h4>
-                    <p className="text-[11px] text-white/50 leading-relaxed whitespace-pre-wrap">{sec.value}</p>
+                  <div key={sec.title} className="bg-white/[0.04] border border-white/[0.08] p-3 rounded-2xl space-y-1.5 hover:bg-white/[0.06] transition-colors">
+                    <h4 className="text-[11px] font-bold text-white/90">{sec.title}</h4>
+                    <p className="text-[11px] text-slate-300/85 leading-relaxed whitespace-pre-wrap">{sec.value}</p>
                   </div>
                 ))}
               </div>
             ) : (
-              <div className="bg-white/[0.01] border border-white/[0.04] border-dashed rounded-2xl p-8 flex flex-col items-center justify-center text-center gap-3">
-                <p className="text-[11px] text-white/35 max-w-sm leading-relaxed">
+              <div className="bg-white/[0.035] border border-white/[0.10] border-dashed rounded-2xl p-8 flex flex-col items-center justify-center text-center gap-3">
+                <p className="text-[11px] text-slate-300/80 max-w-sm leading-relaxed">
                   No AI Project summary generated yet. The AI can audit your chats, checklist roadmap, and documents to construct goals, risks, decisions, and next steps block.
                 </p>
                 <button
@@ -500,12 +511,12 @@ export function ProjectDashboard({
           </div>
 
           {/* Recent Discussion Sessions */}
-          <div className="bg-white/[0.02] border border-white/[0.06] rounded-3xl p-5 space-y-3.5 backdrop-blur-md">
-            <span className="text-[9.5px] font-bold uppercase tracking-widest text-white/30 block">Recent Chat Discussions</span>
+          <div className={cn(panelClass, "rounded-3xl p-5 space-y-3.5")}>
+            <span className={cn(sectionLabelClass, "block")}>Recent Chat Discussions</span>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {sessions.slice(0, 4).map((s: any) => (
-                <div key={s.id} className="bg-white/[0.01] hover:bg-white/[0.03] border border-white/[0.05] rounded-2xl p-3.5 flex flex-col justify-between gap-3 group transition-all">
+                <div key={s.id} className="bg-white/[0.04] hover:bg-white/[0.075] border border-white/[0.08] hover:border-violet-300/25 rounded-2xl p-3.5 flex flex-col justify-between gap-3 group transition-all hover:-translate-y-0.5">
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
                       <span className="text-[11px]">{s.mode === "voice" ? "🎤" : "💬"}</span>
@@ -513,12 +524,12 @@ export function ProjectDashboard({
                         {s.title}
                       </h4>
                     </div>
-                    <span className="text-[9px] text-white/20 block font-mono">Created {new Date(s.created_at).toLocaleDateString()}</span>
+                    <span className="text-[9px] text-slate-400 block font-mono">Created {new Date(s.created_at).toLocaleDateString()}</span>
                   </div>
                   
                   <button
                     onClick={() => onSelectSession(s)}
-                    className="self-end px-3 py-1.5 rounded-lg border border-white/[0.08] hover:border-white/[0.18] bg-white/[0.03] text-white/60 hover:text-white text-[10px] font-medium transition-all"
+                    className="self-end px-3 py-1.5 rounded-lg border border-white/[0.10] hover:border-violet-300/35 bg-white/[0.05] text-white/75 hover:text-white text-[10px] font-medium transition-all"
                   >
                     Resume Discussion →
                   </button>
@@ -558,6 +569,6 @@ export function ProjectDashboard({
         </div>
 
       </div>
-    </div>
+    </motion.div>
   );
 }
