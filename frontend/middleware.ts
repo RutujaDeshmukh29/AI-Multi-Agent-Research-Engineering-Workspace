@@ -18,7 +18,8 @@ export function middleware(request: NextRequest) {
   const token = request.cookies.get("access_token")?.value;
 
   if (!token) {
-    const url = new URL("/auth/login", request.url);
+    const url = request.nextUrl.clone();
+    url.pathname = "/auth/login";
     url.searchParams.set("from", pathname);
     return NextResponse.redirect(url);
   }
