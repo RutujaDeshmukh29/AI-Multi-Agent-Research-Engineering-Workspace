@@ -31,7 +31,7 @@ logger = structlog.get_logger()
 # Model downloads ~90MB on first run, cached after that.
 # "all-MiniLM-L6-v2" is fast, small, and very good for semantic search.
 # ─────────────────────────────────────────
-_model: Optional[SentenceTransformer] = None
+_model: Optional["SentenceTransformer"] = None
 
 def get_embedding_model():
     global _model
