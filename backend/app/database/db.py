@@ -93,7 +93,7 @@ async def init_db() -> None:
     async with engine.begin() as conn:
         # Enable pgvector — safe to run multiple times (IF NOT EXISTS)
         await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
-        logger.info("✅ pgvector extension enabled")
+        logger.info("[SUCCESS] pgvector extension enabled")
 
         # Import all models so Base knows about them before create_all
         from app.database.models import (
@@ -103,7 +103,7 @@ async def init_db() -> None:
 
         # Create tables (won't overwrite existing ones)
         await conn.run_sync(Base.metadata.create_all)
-        logger.info("✅ Tables created/verified")
+        logger.info("[SUCCESS] Tables created/verified")
 
 
 # ─────────────────────────────────────────
