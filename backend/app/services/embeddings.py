@@ -13,7 +13,7 @@
 # Same capability, but lives in your PostgreSQL (persistent after redeploy).
 # ========================
 
-from sentence_transformers import SentenceTransformer
+# Import SentenceTransformer lazily inside get_embedding_model to keep startup memory low
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, text
 from typing import Optional
@@ -33,10 +33,16 @@ logger = structlog.get_logger()
 # ─────────────────────────────────────────
 _model: Optional[SentenceTransformer] = None
 
-def get_embedding_model() -> SentenceTransformer:
+def get_embedding_model():
     global _model
     if _model is None:
         logger.info("Loading embedding model", model=settings.EMBEDDING_MODEL)
+        
+        # Lazy imports to save memory on boot
+        import torch
+        torch.set_num_threads(1)  # Restrict threads to save memory on 512MB RAM environments
+        from sentence_transformers import SentenceTransformer
+        
         _model = SentenceTransformer(settings.EMBEDDING_MODEL)
         logger.info("[SUCCESS] Embedding model loaded")
     return _model
