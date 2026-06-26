@@ -30,6 +30,9 @@ services:
     # Environment variables — set values in Render dashboard
     # Never put real secrets here (this file is in git)
     envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.4
+
       - key: ENVIRONMENT
         value: production
 
