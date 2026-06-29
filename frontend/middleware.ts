@@ -1,4 +1,3 @@
-import "./polyfill";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
@@ -19,7 +18,8 @@ export function middleware(request: NextRequest) {
   const token = request.cookies.get("access_token")?.value;
 
   if (!token) {
-    const redirectUrl = new URL("/auth/login", request.url);
+    const redirectUrl = request.nextUrl.clone();
+    redirectUrl.pathname = "/auth/login";
     redirectUrl.searchParams.set("from", pathname);
     return NextResponse.redirect(redirectUrl);
   }
