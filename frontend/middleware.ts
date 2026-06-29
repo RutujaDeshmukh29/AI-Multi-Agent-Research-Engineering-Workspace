@@ -1,4 +1,4 @@
-// Force cache invalidation for Vercel middleware compilation
+// Force cache invalidation v2: clean rebuild
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
