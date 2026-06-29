@@ -19,10 +19,9 @@ export function middleware(request: NextRequest) {
   const token = request.cookies.get("access_token")?.value;
 
   if (!token) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/auth/login";
-    url.searchParams.set("from", pathname);
-    return NextResponse.redirect(url);
+    const redirectUrl = new URL("/auth/login", request.url);
+    redirectUrl.searchParams.set("from", pathname);
+    return NextResponse.redirect(redirectUrl);
   }
 
   return NextResponse.next();
