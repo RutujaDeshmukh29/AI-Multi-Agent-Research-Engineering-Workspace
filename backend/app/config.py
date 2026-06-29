@@ -5,6 +5,7 @@
 # ========================
 
 from pydantic_settings import BaseSettings
+from pydantic import field_validator
 from typing import List
 
 
@@ -32,6 +33,32 @@ class Settings(BaseSettings):
     # ── Database (Supabase / Neon PostgreSQL) ──
     DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/ai_workspace"
     DATABASE_URL_SYNC: str = "postgresql://postgres:postgres@localhost:5432/ai_workspace"
+
+    @field_validator("DATABASE_URL", mode="before")
+    @classmethod
+    def assemble_db_url(cls, v: any) -> str:
+        if isinstance(v, str) and v:
+            # Replace postgres:// or postgresql:// with postgresql+asyncpg://
+            if v.startswith("postgres://"):
+                v = v.replace("postgres://", "postgresql+asyncpg://", 1)
+            elif v.startswith("postgresql://"):
+                v = v.replace("postgresql://", "postgresql+asyncpg://", 1)
+            
+            # If it already contains postgresql but missing +asyncpg
+            if "postgresql://" in v and "+asyncpg" not in v:
+                v = v.replace("postgresql://", "postgresql+asyncpg://", 1)
+        return v
+
+    @field_validator("DATABASE_URL_SYNC", mode="before")
+    @classmethod
+    def assemble_db_url_sync(cls, v: any) -> str:
+        if isinstance(v, str) and v:
+            # Ensure it starts with postgresql:// and does NOT contain +asyncpg
+            if v.startswith("postgres://"):
+                v = v.replace("postgres://", "postgresql://", 1)
+            if "postgresql+asyncpg://" in v:
+                v = v.replace("postgresql+asyncpg://", "postgresql://", 1)
+        return v
 
     # ── JWT ──────────────────────────────
     JWT_SECRET_KEY: str = "change-this-secret-in-production-use-openssl-rand-hex-32"

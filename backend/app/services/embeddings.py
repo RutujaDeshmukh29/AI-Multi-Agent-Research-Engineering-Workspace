@@ -16,7 +16,7 @@
 # Import SentenceTransformer lazily inside get_embedding_model to keep startup memory low
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, text
-from typing import Optional
+from typing import Optional, Any
 import numpy as np
 import uuid
 import structlog
@@ -31,7 +31,7 @@ logger = structlog.get_logger()
 # Model downloads ~90MB on first run, cached after that.
 # "all-MiniLM-L6-v2" is fast, small, and very good for semantic search.
 # ─────────────────────────────────────────
-_model: Optional["SentenceTransformer"] = None
+_model: Optional[Any] = None
 
 def get_embedding_model():
     global _model
