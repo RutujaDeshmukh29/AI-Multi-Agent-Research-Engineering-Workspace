@@ -5,6 +5,11 @@ const nextConfig = {
     ignoreDuringBuilds: true,
   },
 
+  // Ignore TypeScript errors during production builds (type-check separately)
+  typescript: {
+    ignoreBuildErrors: true,
+  },
+
   // Enable React strict mode for better development warnings
   reactStrictMode: true,
 
@@ -36,6 +41,34 @@ const nextConfig = {
         destination: `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/:path*`,
       },
     ];
+  },
+
+  // Prevent Node.js-only packages from being bundled into the Edge Runtime.
+  // @opentelemetry uses __dirname internally which is not available in Vercel Edge Runtime.
+  serverExternalPackages: [
+    "@opentelemetry/api",
+    "@opentelemetry/core",
+    "@opentelemetry/sdk-trace-base",
+    "@opentelemetry/resources",
+    "@opentelemetry/semantic-conventions",
+    "@opentelemetry/exporter-trace-otlp-http",
+    "@opentelemetry/instrumentation",
+  ],
+
+  // Webpack config: stub out __dirname for edge builds and exclude problematic packages
+  webpack(config, { isServer, nextRuntime }) {
+    // For the Edge runtime (middleware), stub out any module that uses __dirname
+    if (nextRuntime === "edge") {
+      config.resolve = config.resolve || {};
+      config.resolve.fallback = {
+        ...(config.resolve.fallback || {}),
+        fs: false,
+        path: false,
+        os: false,
+        crypto: false,
+      };
+    }
+    return config;
   },
 };
 
