@@ -1,7 +1,10 @@
+
+
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 // Cache invalidation token: 2026-06-29-23-15-force-recompile
+
 
 const PUBLIC_ROUTES = ["/auth/login", "/auth/signup"];
 
