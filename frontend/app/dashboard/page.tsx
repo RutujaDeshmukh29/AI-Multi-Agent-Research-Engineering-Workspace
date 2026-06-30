@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { useProjects, useCreateProject } from "@/hooks/useProjects";
@@ -21,9 +21,17 @@ const PROJECT_COLORS = ["#6366f1", "#8b5cf6", "#06b6d4", "#10b981", "#f59e0b", "
 
 export default function DashboardPage() {
   const router = useRouter();
-  const { user } = useAuthStore();
+  const { user, isAuthenticated } = useAuthStore();
   const { data: projects = [], isLoading } = useProjects();
   const createProject = useCreateProject();
+
+  // Client-side auth guard — replaces middleware route protection
+  useEffect(() => {
+    const token = localStorage.getItem("access_token");
+    if (!token && !isAuthenticated) {
+      router.replace("/auth/login");
+    }
+  }, [isAuthenticated, router]);
 
   // Create Project modal state
   const [showCreate, setShowCreate] = useState(false);
