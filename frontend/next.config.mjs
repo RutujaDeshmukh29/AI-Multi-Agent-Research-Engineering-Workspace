@@ -56,8 +56,8 @@ const nextConfig = {
   ],
 
   // Webpack config: stub out __dirname for edge builds and exclude problematic packages
-  webpack(config, { isServer, nextRuntime }) {
-    // For the Edge runtime (middleware), stub out any module that uses __dirname
+  webpack(config, { webpack, nextRuntime }) {
+    // For the Edge runtime (middleware), stub out __dirname and Node.js globals
     if (nextRuntime === "edge") {
       config.resolve = config.resolve || {};
       config.resolve.fallback = {
@@ -67,6 +67,9 @@ const nextConfig = {
         os: false,
         crypto: false,
       };
+
+      // (Removed BannerPlugin because it was corrupting Vercel edge chunks and causing 404s.
+      // The polyfill.ts file handles the __dirname ReferenceError cleanly.)
     }
     return config;
   },
