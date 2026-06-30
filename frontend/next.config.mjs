@@ -43,36 +43,6 @@ const nextConfig = {
     ];
   },
 
-  // Prevent Node.js-only packages from being bundled into the Edge Runtime.
-  // @opentelemetry uses __dirname internally which is not available in Vercel Edge Runtime.
-  serverExternalPackages: [
-    "@opentelemetry/api",
-    "@opentelemetry/core",
-    "@opentelemetry/sdk-trace-base",
-    "@opentelemetry/resources",
-    "@opentelemetry/semantic-conventions",
-    "@opentelemetry/exporter-trace-otlp-http",
-    "@opentelemetry/instrumentation",
-  ],
-
-  // Webpack config: stub out __dirname for edge builds and exclude problematic packages
-  webpack(config, { webpack, nextRuntime }) {
-    // For the Edge runtime (middleware), stub out __dirname and Node.js globals
-    if (nextRuntime === "edge") {
-      config.resolve = config.resolve || {};
-      config.resolve.fallback = {
-        ...(config.resolve.fallback || {}),
-        fs: false,
-        path: false,
-        os: false,
-        crypto: false,
-      };
-
-      // (Removed BannerPlugin because it was corrupting Vercel edge chunks and causing 404s.
-      // The polyfill.ts file handles the __dirname ReferenceError cleanly.)
-    }
-    return config;
-  },
 };
 
 export default nextConfig;
