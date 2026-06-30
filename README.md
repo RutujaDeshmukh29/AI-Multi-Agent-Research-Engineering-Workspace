@@ -17,7 +17,7 @@
 
 <br/>
 
-[**Live Demo**](https://your-app.vercel.app) 
+[**Live Demo**](https://ai-multi-agent-workspace.vercel.app/) 
 
 </div>
 
@@ -49,7 +49,7 @@ You ask: "How do I build an AI-powered crop monitoring drone?"
 ## 📸 Screenshots & Demos
 
 > [!NOTE]
-> For a live demonstration walkthrough and additional views, please refer to the [Live Demo & Screenshots Walkthrough Link](https://your-demo-or-gallery-link.com) *(URL will be updated soon)*.
+> For a live demonstration walkthrough and additional views, please refer to the [Live Demo](https://ai-multi-agent-workspace.vercel.app/).
 
 To view the raw image assets directly in this repository, visit the [assets/screenshots](assets/screenshots/) folder.
 
