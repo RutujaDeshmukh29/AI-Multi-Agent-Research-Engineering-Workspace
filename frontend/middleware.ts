@@ -1,18 +1,12 @@
-import "./polyfill";
-import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { NextResponse } from "next/server";
 
 const PUBLIC_ROUTES = ["/auth/login", "/auth/signup"];
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Pass through public auth routes
-  if (PUBLIC_ROUTES.some((r) => pathname.startsWith(r))) {
-    return NextResponse.next();
-  }
-
-  // Pass through Next.js internals, API routes, and static files
+  // Always pass through Next.js internals and static files
   if (
     pathname.startsWith("/_next") ||
     pathname.startsWith("/api") ||
@@ -21,12 +15,15 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Check for auth cookie
-  const token = request.cookies.get("access_token")?.value;
+  // Always pass through public auth routes
+  if (PUBLIC_ROUTES.some((r) => pathname.startsWith(r))) {
+    return NextResponse.next();
+  }
 
+  // Check for auth cookie — redirect to login if missing
+  const token = request.cookies.get("access_token")?.value;
   if (!token) {
-    const loginUrl = request.nextUrl.clone();
-    loginUrl.pathname = "/auth/login";
+    const loginUrl = new URL("/auth/login", request.url);
     loginUrl.searchParams.set("from", pathname);
     return NextResponse.redirect(loginUrl);
   }
@@ -35,5 +32,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|favicon.png).*)"],
 };
