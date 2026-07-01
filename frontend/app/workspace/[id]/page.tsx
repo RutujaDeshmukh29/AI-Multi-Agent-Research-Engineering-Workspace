@@ -129,6 +129,10 @@ export default function WorkspacePage() {
 
   // ── Effects ────────────────────────────────────────────────────
   useEffect(() => {
+    if (typeof window !== "undefined" && window.innerWidth < 768) {
+      setSidebarOpen(false);
+    }
+    
     return () => {
       if (recognitionRef.current) {
         recognitionRef.current.abort();
@@ -496,13 +500,22 @@ export default function WorkspacePage() {
 
       <AnimatePresence>
         {sidebarOpen && (
-          <motion.aside
-            initial={{ x: -230, opacity: 0 }}
-            animate={{ x: 0, opacity: 1 }}
-            exit={{ x: -230, opacity: 0 }}
-            transition={{ type: "spring", stiffness: 350, damping: 35 }}
-            className="w-[230px] flex-shrink-0 bg-[#0c0e18]/98 border-r border-white/[0.09] flex flex-col z-20 backdrop-blur-xl h-screen overflow-hidden sticky top-0"
-          >
+          <>
+            {/* Mobile backdrop to close sidebar */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setSidebarOpen(false)}
+              className="md:hidden fixed inset-0 bg-black/50 backdrop-blur-sm z-40"
+            />
+            <motion.aside
+              initial={{ x: -230, opacity: 0 }}
+              animate={{ x: 0, opacity: 1 }}
+              exit={{ x: -230, opacity: 0 }}
+              transition={{ type: "spring", stiffness: 350, damping: 35 }}
+              className="absolute md:relative md:sticky top-0 left-0 w-[230px] flex-shrink-0 bg-[#0c0e18]/98 border-r border-white/[0.09] flex flex-col z-50 backdrop-blur-xl h-screen overflow-hidden"
+            >
             {/* Sidebar Header */}
             <div className="p-4 border-b border-white/[0.09] flex flex-col gap-3">
               <div className="flex items-center justify-between">
@@ -532,7 +545,7 @@ export default function WorkspacePage() {
               <p className="text-[9.5px] font-bold text-white/20 uppercase tracking-widest px-2.5 mb-2">Projects</p>
               <div className="space-y-0.5 max-h-[160px] overflow-y-auto" style={{ scrollbarWidth: "none" }}>
                 {projects.map((p: any) => (
-                  <button key={p.id} onClick={() => router.push(`/workspace/${p.id}`)}
+                  <button key={p.id} onClick={() => { router.push(`/workspace/${p.id}`); if (window.innerWidth < 768) setSidebarOpen(false); }}
                     className={cn(
                       "w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left transition-all hover:scale-[0.98]",
                       p.id === projectId 
@@ -569,7 +582,7 @@ export default function WorkspacePage() {
                         onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); if (e.key === "Escape") setRenameId(null); }}
                         className="w-full px-2.5 py-1.5 bg-violet-600/10 border border-violet-500/30 rounded-lg text-[12px] text-white outline-none" />
                     ) : (
-                      <button onClick={() => setActiveSession(s)}
+                      <button onClick={() => { setActiveSession(s); if (window.innerWidth < 768) setSidebarOpen(false); }}
                         className={cn(
                           "w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left transition-all border border-transparent pr-14 hover:scale-[0.98]",
                           s.id === activeSession?.id 
@@ -672,6 +685,7 @@ export default function WorkspacePage() {
               </AnimatePresence>
             </div>
           </motion.aside>
+          </>
         )}
       </AnimatePresence>
 
